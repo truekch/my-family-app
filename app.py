@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 
 # 앱 기본 설정
@@ -25,7 +25,6 @@ def get_drive_service():
 
 try:
     drive_service = get_drive_service()
-    # 최상단 혹은 섹션 내부 어느 곳에 있어도 안전하게 가져오기
     if "DRIVE_FOLDER_ID" in st.secrets:
         FOLDER_ID = st.secrets["DRIVE_FOLDER_ID"]
     elif "DRIVE_FOLDER_ID" in st.secrets.get("gcp_service_account", {}):
@@ -39,23 +38,22 @@ except Exception as e:
 
 # --- 구글 드라이브 파일 읽기/쓰기 도우미 함수 ---
 def upload_file_to_drive(file_bytes, file_name, mime_type):
-    """파일을 구글 드라이브 폴더로 업로드하고 파일 ID 반환"""
-    temp_local_path = f"temp_{file_name}"
-    with open(temp_local_path, "wb") as f:
-        f.write(file_bytes)
-        
+    """메모리 바이트(io.BytesIO)를 구글 드라이브 폴더로 안전하게 업로드"""
     file_metadata = {
         'name': file_name,
         'parents': [FOLDER_ID]
     }
-    media = MediaFileUpload(temp_local_path, mimetype=mime_type, resumable=True)
+    # Resumable 업로드 대신 직관적이고 안정적인 MediaIoBaseUpload 사용
+    fh = io.BytesIO(file_bytes)
+    media = MediaIoBaseUpload(fh, mimetype=mime_type, resumable=False)
+    
     uploaded_file = drive_service.files().create(
-        body=file_metadata, media_body=media, fields='id'
+        body=file_metadata,
+        media_body=media,
+        fields='id',
+        supportsAllDrives=True
     ).execute()
     
-    if os.path.exists(temp_local_path):
-        os.remove(temp_local_path)
-        
     return uploaded_file.get('id')
 
 def download_file_from_drive(file_id):
@@ -70,38 +68,36 @@ def download_file_from_drive(file_id):
 
 def load_posts_from_drive():
     """구글 드라이브에서 posts.json 파일 찾아 게시글 목록 불러오기"""
-    query = f"'{FOLDER_ID}' in parents and name = 'posts.json' and trashed = false"
-    results = drive_service.files().list(q=query, fields="files(id)").execute()
-    files = results.get('files', [])
-    
-    if not files:
+    try:
+        query = f"'{FOLDER_ID}' in parents and name = 'posts.json' and trashed = false"
+        results = drive_service.files().list(q=query, fields="files(id)").execute()
+        files = results.get('files', [])
+        
+        if not files:
+            return [], None
+        
+        file_id = files[0]['id']
+        content = download_file_from_drive(file_id)
+        return json.loads(content.decode('utf-8')), file_id
+    except Exception as e:
+        st.error(f"게시글 로딩 중 오류가 발생했습니다: {e}")
         return [], None
-    
-    file_id = files[0]['id']
-    content = download_file_from_drive(file_id)
-    return json.loads(content.decode('utf-8')), file_id
 
 def save_posts_to_drive(posts, existing_file_id=None):
     """게시글 목록을 json으로 변환하여 구글 드라이브에 저장"""
     json_bytes = json.dumps(posts, ensure_ascii=False, indent=2).encode('utf-8')
-    temp_json_path = "temp_posts.json"
-    with open(temp_json_path, "wb") as f:
-        f.write(json_bytes)
-        
-    media = MediaFileUpload(temp_json_path, mimetype='application/json')
+    fh = io.BytesIO(json_bytes)
+    media = MediaIoBaseUpload(fh, mimetype='application/json', resumable=False)
     
     if existing_file_id:
         drive_service.files().update(
-            fileId=existing_file_id, media_body=media
+            fileId=existing_file_id, media_body=media, supportsAllDrives=True
         ).execute()
     else:
         file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
         drive_service.files().create(
-            body=file_metadata, media_body=media
+            body=file_metadata, media_body=media, supportsAllDrives=True
         ).execute()
-        
-    if os.path.exists(temp_posts_path := "temp_posts.json"):
-        os.remove(temp_posts_path)
 
 # --- 게시물 데이터 불러오기 ---
 posts, posts_file_id = load_posts_from_drive()
@@ -117,28 +113,32 @@ with st.form("upload_form", clear_on_submit=True):
     if submitted:
         if photo is not None and caption.strip() != "":
             with st.spinner("구글 원 드라이브로 사진을 전송 중입니다..."):
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                photo_name = f"{timestamp}_{photo.name}"
-                
-                # 1. 구글 드라이브에 사진 업로드
-                photo_drive_id = upload_file_to_drive(
-                    photo.getbuffer(), photo_name, photo.type
-                )
-                
-                # 2. 새 포스트 데이터 생성
-                new_post = {
-                    "author": author,
-                    "photo_id": photo_drive_id,
-                    "caption": caption,
-                    "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
-                }
-                
-                # 3. 최신 포스트를 맨 앞에 추가 후 구글 드라이브에 저장
-                posts.insert(0, new_post)
-                save_posts_to_drive(posts, posts_file_id)
-                
-                st.success("🎉 내 구글 원 2TB 드라이브에 안전하게 영구 저장되었습니다!")
-                st.rerun()
+                try:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    photo_name = f"{timestamp}_{photo.name}"
+                    mime_type = photo.type if photo.type else 'image/jpeg'
+                    
+                    # 1. 구글 드라이브에 사진 업로드
+                    photo_drive_id = upload_file_to_drive(
+                        photo.getvalue(), photo_name, mime_type
+                    )
+                    
+                    # 2. 새 포스트 데이터 생성
+                    new_post = {
+                        "author": author,
+                        "photo_id": photo_drive_id,
+                        "caption": caption,
+                        "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
+                    }
+                    
+                    # 3. 최신 포스트를 맨 앞에 추가 후 구글 드라이브에 저장
+                    posts.insert(0, new_post)
+                    save_posts_to_drive(posts, posts_file_id)
+                    
+                    st.success("🎉 내 구글 원 2TB 드라이브에 안전하게 영구 저장되었습니다!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"사진 업로드 중 오류가 발생했습니다: {e}")
         else:
             st.warning("사진과 글을 모두 입력해 주세요.")
 
@@ -156,7 +156,7 @@ else:
             # 구글 드라이브에서 사진 데이터 가져와서 표시
             img_bytes = download_file_from_drive(post["photo_id"])
             st.image(img_bytes, use_container_width=True)
-        except Exception:
+        except Exception as e:
             st.warning("🖼️ 사진을 불러오는 중 오류가 발생했습니다.")
         st.write(post["caption"])
         st.divider()
