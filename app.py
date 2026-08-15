@@ -38,15 +38,15 @@ except Exception as e:
 
 # --- 구글 드라이브 파일 읽기/쓰기 도우미 함수 ---
 def upload_file_to_drive(file_bytes, file_name, mime_type):
-    """메모리 바이트(io.BytesIO)를 구글 드라이브 폴더로 안전하게 업로드"""
+    """구글 드라이브 폴더로 파일 업로드 (내 구글 원 2TB 용량 사용)"""
     file_metadata = {
         'name': file_name,
         'parents': [FOLDER_ID]
     }
-    # Resumable 업로드 대신 직관적이고 안정적인 MediaIoBaseUpload 사용
     fh = io.BytesIO(file_bytes)
     media = MediaIoBaseUpload(fh, mimetype=mime_type, resumable=False)
     
+    # supportsAllDrives=True 옵션을 포함하여 내 공유 폴더 내 생성 지정
     uploaded_file = drive_service.files().create(
         body=file_metadata,
         media_body=media,
@@ -70,7 +70,12 @@ def load_posts_from_drive():
     """구글 드라이브에서 posts.json 파일 찾아 게시글 목록 불러오기"""
     try:
         query = f"'{FOLDER_ID}' in parents and name = 'posts.json' and trashed = false"
-        results = drive_service.files().list(q=query, fields="files(id)").execute()
+        results = drive_service.files().list(
+            q=query, 
+            fields="files(id)",
+            supportsAllDrives=True,
+            includeItemsFromAllDrives=True
+        ).execute()
         files = results.get('files', [])
         
         if not files:
@@ -91,12 +96,16 @@ def save_posts_to_drive(posts, existing_file_id=None):
     
     if existing_file_id:
         drive_service.files().update(
-            fileId=existing_file_id, media_body=media, supportsAllDrives=True
+            fileId=existing_file_id, 
+            media_body=media, 
+            supportsAllDrives=True
         ).execute()
     else:
         file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
         drive_service.files().create(
-            body=file_metadata, media_body=media, supportsAllDrives=True
+            body=file_metadata, 
+            media_body=media, 
+            supportsAllDrives=True
         ).execute()
 
 # --- 게시물 데이터 불러오기 ---
@@ -156,7 +165,7 @@ else:
             # 구글 드라이브에서 사진 데이터 가져와서 표시
             img_bytes = download_file_from_drive(post["photo_id"])
             st.image(img_bytes, use_container_width=True)
-        except Exception as e:
+        except Exception:
             st.warning("🖼️ 사진을 불러오는 중 오류가 발생했습니다.")
         st.write(post["caption"])
         st.divider()
