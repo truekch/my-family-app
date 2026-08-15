@@ -18,9 +18,6 @@ SCOPES = ['https://www.googleapis.com/auth/drive']
 def get_drive_service():
     """Streamlit Secrets의 GCP 정보를 이용해 Google Drive API 서비스 생성"""
     creds_dict = dict(st.secrets["gcp_service_account"])
-    # secrets 내의 폴더 ID 키 제거 후 인증 진행
-    creds_dict.pop("DRIVE_FOLDER_ID", None)
-    
     creds = service_account.Credentials.from_service_account_info(
         creds_dict, scopes=SCOPES
     )
@@ -28,9 +25,16 @@ def get_drive_service():
 
 try:
     drive_service = get_drive_service()
-    FOLDER_ID = st.secrets["DRIVE_FOLDER_ID"]
+    # 최상단 혹은 섹션 내부 어느 곳에 있어도 안전하게 가져오기
+    if "DRIVE_FOLDER_ID" in st.secrets:
+        FOLDER_ID = st.secrets["DRIVE_FOLDER_ID"]
+    elif "DRIVE_FOLDER_ID" in st.secrets.get("gcp_service_account", {}):
+        FOLDER_ID = st.secrets["gcp_service_account"]["DRIVE_FOLDER_ID"]
+    else:
+        st.error("Secrets에 DRIVE_FOLDER_ID 설정이 누락되었습니다.")
+        st.stop()
 except Exception as e:
-    st.error("Google Drive 연결 설정에 실패했습니다. Secrets 설정을 확인해 주세요.")
+    st.error(f"Google Drive 연결 설정에 실패했습니다: {e}")
     st.stop()
 
 # --- 구글 드라이브 파일 읽기/쓰기 도우미 함수 ---
