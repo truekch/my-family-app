@@ -12,35 +12,26 @@ import io
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 PC & 모바일 공통: 버튼 완벽 밀착 정렬 CSS ---
+# --- 🎨 PC & 모바일 버튼 완벽 밀착 CSS ---
 st.markdown("""
 <style>
-/* 1. PC 및 모바일 공통: 수정/삭제 버튼 컬럼의 강제 너비 분배를 해제하고 버튼 크기에 맞춤 */
-div[data-testid="stHorizontalBlock"]:has(button[key*="btn_show_edit_"]) {
-    display: flex !important;
-    flex-direction: row !important;
-    justify-content: flex-start !important;
-    align-items: center !important;
-    gap: 8px !important;
+/* 1. 모바일 화면(640px 이하)에서 컬럼이 밑으로 떨어지는 Streamlit 기본 동작 차단 */
+@media (max-width: 640px) {
+    div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+    }
+    div[data-testid="stColumn"] {
+        min-width: 0 !important;
+        flex: 1 1 auto !important;
+    }
 }
 
-div[data-testid="stHorizontalBlock"]:has(button[key*="btn_show_edit_"]) > div[data-testid="stColumn"] {
-    width: auto !important;
-    flex: 0 0 auto !important;
-    min-width: unset !important;
-}
-
-/* 2. 버튼 내부 글자 줄바꿈 금지 및 여백 최적화 */
+/* 2. 모든 버튼 글자 줄바꿈 금지 및 깔끔한 패딩 설정 */
 div[data-testid="stButton"] button {
-    padding: 4px 12px !important;
-    min-height: 38px !important;
     white-space: nowrap !important;
     word-break: keep-all !important;
-}
-
-div[data-testid="stButton"] button p {
-    white-space: nowrap !important;
-    word-break: keep-all !important;
+    padding: 4px 10px !important;
     font-size: 14px !important;
 }
 </style>
@@ -271,8 +262,8 @@ else:
 
         st.write(post["caption"])
         
-        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 (CSS에 의해 컬럼이 크기에 딱 맞춰 정렬됨)
-        col_btn1, col_btn2 = st.columns(2)
+        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 (1:1:3 비율로 좌측 밀착)
+        col_btn1, col_btn2, _ = st.columns([1, 1, 3])
         with col_btn1:
             show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
         with col_btn2:
