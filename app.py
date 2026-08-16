@@ -1,13 +1,13 @@
 import streamlit as st
 import json
 import os
+import base64
 from datetime import datetime
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
-from PIL import Image
 
 # 앱 기본 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
@@ -187,20 +187,19 @@ else:
     for idx, post in enumerate(posts):
         st.markdown(f"**{post['author']}** · `{post['date']}`")
         try:
-            # 메모리 Segfault 방지: BytesIO -> PIL Image -> 안전한 width 설정
+            # Base64 변환 후 HTML <img> 태그 직접 렌더링 (Segmentation Fault 완벽 차단)
             img_bytes = download_file_from_drive(post["photo_id"])
-            image_obj = Image.open(io.BytesIO(img_bytes))
-            st.image(image_obj, width="stretch")
+            b64_data = base64.b64encode(img_bytes).decode('utf-8')
+            img_html = f'<img src="data:image/jpeg;base64,{b64_data}" style="width:100%; border-radius:8px; margin-bottom:10px;">'
+            st.markdown(img_html, unsafe_allow_html=True)
         except Exception:
             st.warning("🖼️ 사진을 불러오는 중 오류가 발생했습니다.")
             
         st.write(post["caption"])
         
-        # 고유 ID 생성 (Key 충돌 방지)
         post_key = post.get("photo_id", str(idx))
         
         with st.expander("⚙️ 게시글 관리"):
-            # 1. 글 수정
             st.markdown("**:pencil2: 글 수정하기**")
             authors_list = ["아빠", "엄마", "첫째", "둘째"]
             curr_author_idx = authors_list.index(post['author']) if post['author'] in authors_list else 0
@@ -217,7 +216,6 @@ else:
             
             st.divider()
             
-            # 2. 글 삭제
             st.markdown("**:wastebasket: 글 삭제하기**")
             if st.button("🗑️ 게시글 및 사진 영구 삭제", key=f"btn_del_{post_key}"):
                 delete_file_from_drive(post["photo_id"])
