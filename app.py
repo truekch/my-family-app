@@ -12,6 +12,8 @@ import io
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
+FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
+
 # --- 1. 가족 전용 비밀번호(PIN) 인증 ---
 FAMILY_PIN = st.secrets.get("FAMILY_PIN", "123456")
 
@@ -60,6 +62,8 @@ except Exception as e:
 @st.cache_data(ttl=3600, show_spinner=False)
 def download_image_b64(file_id):
     """드라이브에서 이미지를 받아와 Base64로 변환 후 캐싱(1시간)"""
+    if not file_id:
+        return None
     try:
         request = drive_service.files().get_media(fileId=file_id)
         fh = io.BytesIO()
@@ -89,6 +93,8 @@ def upload_file_to_drive(file_bytes, file_name, mime_type):
     return uploaded_file.get('id')
 
 def delete_file_from_drive(file_id):
+    if not file_id:
+        return
     try:
         drive_service.files().delete(fileId=file_id).execute()
     except Exception:
@@ -117,7 +123,7 @@ def save_posts(posts, file_id=None):
     else:
         file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
         drive_service.files().create(body=file_metadata, media_body=media).execute()
-    st.cache_data.clear() # 게시글 저장 시 캐시 초기화
+    st.cache_data.clear()
 
 # --- 4. 메인 화면 구성 ---
 col_head1, col_head2 = st.columns([4, 1])
@@ -130,23 +136,26 @@ with col_head2:
 
 posts, posts_file_id = load_posts()
 
-# 📸 새 기록 남기기 폼
+# 📸 새 기록 남기기 폼 (사진 선택은 권장, 글만 등록도 가능)
 st.subheader("📸 새 기록 남기기")
 with st.form("upload_form", clear_on_submit=True):
-    author = st.selectbox("작성자", ["아빠", "엄마", "첫째", "둘째"])
-    photo = st.file_uploader("사진 선택", type=["jpg", "jpeg", "png", "heic", "webp"])
+    author = st.selectbox("작성자", FAMILY_MEMBERS)
+    photo = st.file_uploader("사진 선택 (선택 사항)", type=["jpg", "jpeg", "png", "heic", "webp"])
     caption = st.text_area("오늘 어떤 일이 있었나요?")
     submitted = st.form_submit_button("가족 기록 올리기")
 
     if submitted:
-        if photo is not None and caption.strip() != "":
+        if caption.strip() != "":
             with st.spinner("내 구글 원 2TB 드라이브로 저장 중..."):
                 try:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    photo_name = f"{timestamp}_{photo.name}"
-                    mime_type = photo.type if photo.type else 'image/jpeg'
+                    photo_id = None
                     
-                    photo_id = upload_file_to_drive(photo.getvalue(), photo_name, mime_type)
+                    # 사진이 들어왔을 때만 업로드 진행
+                    if photo is not None:
+                        photo_name = f"{timestamp}_{photo.name}"
+                        mime_type = photo.type if photo.type else 'image/jpeg'
+                        photo_id = upload_file_to_drive(photo.getvalue(), photo_name, mime_type)
                     
                     new_post = {
                         "id": timestamp,
@@ -162,7 +171,7 @@ with st.form("upload_form", clear_on_submit=True):
                 except Exception as e:
                     st.error(f"업로드 에러: {e}")
         else:
-            st.warning("사진과 글을 모두 입력해 주세요.")
+            st.warning("글 내용을 작성해 주세요.")
 
 st.divider()
 
@@ -176,21 +185,51 @@ else:
         p_id = post.get("id", str(idx))
         st.markdown(f"**{post['author']}** · `{post['date']}`")
         
-        # 캐싱된 이미지 출력
-        b64_str = download_image_b64(post["photo_id"])
-        if b64_str:
-            st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
-        else:
-            st.warning("🖼️ 사진을 불러올 수 없습니다.")
+        # 사진이 있는 게시물만 이미지 표시
+        if post.get("photo_id"):
+            b64_str = download_image_b64(post["photo_id"])
+            if b64_str:
+                st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
+            else:
+                st.warning("🖼️ 사진을 불러올 수 없습니다.")
             
         st.write(post["caption"])
         
-        # 삭제 버튼만 깔끔하게 배치 (메모리 부담 최소화)
-        if st.button("🗑️ 삭제", key=f"del_{p_id}_{idx}"):
-            delete_file_from_drive(post["photo_id"])
-            posts.pop(idx)
-            save_posts(posts, posts_file_id)
-            st.success("삭제되었습니다!")
-            st.rerun()
+        # 수정 및 삭제 버튼 영역
+        col_btn1, col_btn2, _ = st.columns([1, 1, 2])
+        with col_btn1:
+            show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
+        with col_btn2:
+            if st.button("🗑️ 삭제", key=f"del_{p_id}_{idx}"):
+                if post.get("photo_id"):
+                    delete_file_from_drive(post["photo_id"])
+                posts.pop(idx)
+                save_posts(posts, posts_file_id)
+                st.success("삭제되었습니다!")
+                st.rerun()
+
+        # ✏️ 수정 화면 toggling
+        if f"editing_{p_id}" not in st.session_state:
+            st.session_state[f"editing_{p_id}"] = False
+
+        if show_edit:
+            st.session_state[f"editing_{p_id}"] = not st.session_state[f"editing_{p_id}"]
+
+        if st.session_state[f"editing_{p_id}"]:
+            with st.container():
+                st.markdown("---")
+                st.markdown("**:pencil2: 게시글 수정**")
+                
+                curr_author_idx = FAMILY_MEMBERS.index(post['author']) if post['author'] in FAMILY_MEMBERS else 0
+                new_author = st.selectbox("작성자", FAMILY_MEMBERS, index=curr_author_idx, key=f"edit_auth_{p_id}")
+                new_caption = st.text_area("글 내용", value=post["caption"], key=f"edit_cap_{p_id}")
+                
+                if st.button("수정 저장하기", key=f"save_edit_{p_id}"):
+                    posts[idx]["author"] = new_author
+                    posts[idx]["caption"] = new_caption
+                    save_posts(posts, posts_file_id)
+                    st.session_state[f"editing_{p_id}"] = False
+                    st.success("수정 완료!")
+                    st.rerun()
             
         st.divider()
