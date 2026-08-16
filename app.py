@@ -125,8 +125,8 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
-# --- 4. 메인 화면 구성 ---
-col_head1, col_head2 = st.columns([4, 1])
+# --- 4. 메인 헤더 및 상태 초기화 ---
+col_head1, col_head2 = st.columns([3, 1])
 with col_head1:
     st.title("❤️ 우리 가족 파이썬 기록장")
 with col_head2:
@@ -136,45 +136,56 @@ with col_head2:
 
 posts, posts_file_id = load_posts()
 
-# 📸 새 기록 남기기 폼 (다중 사진 선택 가능 accept_multiple_files=True)
-st.subheader("📸 새 기록 남기기")
-with st.form("upload_form", clear_on_submit=True):
-    author = st.selectbox("작성자", FAMILY_MEMBERS)
-    photos = st.file_uploader("사진 선택 (여러 장 가능, 선택 사항)", type=["jpg", "jpeg", "png", "heic", "webp"], accept_multiple_files=True)
-    caption = st.text_area("오늘 어떤 일이 있었나요?")
-    submitted = st.form_submit_button("가족 기록 올리기")
+# 작성 폼 열림/닫힘 세션 상태
+if "show_upload_form" not in st.session_state:
+    st.session_state["show_upload_form"] = False
 
-    if submitted:
-        if caption.strip() != "":
-            with st.spinner("내 구글 원 2TB 드라이브로 사진 전송 중..."):
-                try:
-                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    photo_ids = []
-                    
-                    # 여러 장의 사진 순차 업로드
-                    if photos:
-                        for p_idx, photo in enumerate(photos):
-                            photo_name = f"{timestamp}_{p_idx}_{photo.name}"
-                            mime_type = photo.type if photo.type else 'image/jpeg'
-                            p_id = upload_file_to_drive(photo.getvalue(), photo_name, mime_type)
-                            photo_ids.append(p_id)
-                    
-                    new_post = {
-                        "id": timestamp,
-                        "author": author,
-                        "photo_ids": photo_ids,  # 다중 사진 ID 배열
-                        "caption": caption,
-                        "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M"),
-                        "comments": []
-                    }
-                    posts.insert(0, new_post)
-                    save_posts(posts, posts_file_id)
-                    st.success("🎉 영구 저장되었습니다!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"업로드 에러: {e}")
-        else:
-            st.warning("글 내용을 작성해 주세요.")
+# 📸 새 기록 남기기 토글 버튼
+col_btn_new, _ = st.columns([1, 1])
+with col_btn_new:
+    if st.button("📸 새 기록 남기기", key="toggle_upload_btn", use_container_width=True):
+        st.session_state["show_upload_form"] = not st.session_state["show_upload_form"]
+
+# 📸 새 기록 남기기 작성 폼 (버튼 누를 때만 펼쳐짐)
+if st.session_state["show_upload_form"]:
+    with st.form("upload_form", clear_on_submit=True):
+        st.subheader("✏️ 새로운 추억 남기기")
+        author = st.selectbox("작성자", FAMILY_MEMBERS)
+        photos = st.file_uploader("사진 선택 (여러 장 가능, 선택 사항)", type=["jpg", "jpeg", "png", "heic", "webp"], accept_multiple_files=True)
+        caption = st.text_area("오늘 어떤 일이 있었나요?")
+        submitted = st.form_submit_button("가족 기록 올리기")
+
+        if submitted:
+            if caption.strip() != "":
+                with st.spinner("내 구글 원 2TB 드라이브로 저장 중..."):
+                    try:
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        photo_ids = []
+                        
+                        if photos:
+                            for p_idx, photo in enumerate(photos):
+                                photo_name = f"{timestamp}_{p_idx}_{photo.name}"
+                                mime_type = photo.type if photo.type else 'image/jpeg'
+                                p_id = upload_file_to_drive(photo.getvalue(), photo_name, mime_type)
+                                photo_ids.append(p_id)
+                        
+                        new_post = {
+                            "id": timestamp,
+                            "author": author,
+                            "photo_ids": photo_ids,
+                            "caption": caption,
+                            "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M"),
+                            "comments": []
+                        }
+                        posts.insert(0, new_post)
+                        save_posts(posts, posts_file_id)
+                        st.session_state["show_upload_form"] = False  # 등록 후 폼 닫기
+                        st.success("🎉 영구 저장되었습니다!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"업로드 에러: {e}")
+            else:
+                st.warning("글 내용을 작성해 주세요.")
 
 st.divider()
 
@@ -202,7 +213,7 @@ if filter_author != "전체" or search_keyword.strip():
 
 if not filtered_posts:
     if not posts:
-        st.info("아직 등록된 기록이 없습니다. 첫 번째 추억을 올려보세요!")
+        st.info("아직 등록된 기록이 없습니다. 상단의 [📸 새 기록 남기기] 버튼을 눌러 첫 추억을 작성해 보세요!")
     else:
         st.info("조건에 일치하는 기록이 없습니다.")
 else:
@@ -210,19 +221,17 @@ else:
         p_id = post.get("id", str(idx))
         st.markdown(f"**{post['author']}** · `{post['date']}`")
         
-        # 이전 버전 단일 photo_id 호환성 처리 및 신규 photo_ids 배열 추출
+        # 다중 사진 및 호환성 처리
         p_ids = post.get("photo_ids", [])
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
             
-        # 다중 사진 출력 (1장 / 여러 장 분기 처리)
         if p_ids:
             if len(p_ids) == 1:
                 b64_str = download_image_b64(p_ids[0])
                 if b64_str:
                     st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
             else:
-                # 2장 이상일 경우 2열 그리드로 나란히 배치
                 cols = st.columns(2)
                 for img_idx, img_id in enumerate(p_ids):
                     b64_str = download_image_b64(img_id)
@@ -238,7 +247,6 @@ else:
             show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
         with col_btn2:
             if st.button("🗑️ 삭제", key=f"del_{p_id}_{idx}"):
-                # 연관된 모든 사진 삭제
                 for img_id in p_ids:
                     delete_file_from_drive(img_id)
                 posts = [p for p in posts if p.get("id") != post.get("id")]
