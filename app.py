@@ -12,19 +12,22 @@ import io
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 버튼 텍스트 줄바꿈 방지 & 모바일 최적화 CSS ---
+# --- 🎨 PC & 모바일 공통: 버튼 완벽 밀착 정렬 CSS ---
 st.markdown("""
 <style>
-/* 1. 모바일에서 컬럼이 세로로 꺾이지 않고 가로 유지 */
-@media (max-width: 640px) {
-    div[data-testid="stHorizontalBlock"] {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 8px !important;
-    }
-    div[data-testid="stColumn"] {
-        min-width: 0 !important;
-    }
+/* 1. PC 및 모바일 공통: 수정/삭제 버튼 컬럼의 강제 너비 분배를 해제하고 버튼 크기에 맞춤 */
+div[data-testid="stHorizontalBlock"]:has(button[key*="btn_show_edit_"]) {
+    display: flex !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+div[data-testid="stHorizontalBlock"]:has(button[key*="btn_show_edit_"]) > div[data-testid="stColumn"] {
+    width: auto !important;
+    flex: 0 0 auto !important;
+    min-width: unset !important;
 }
 
 /* 2. 버튼 내부 글자 줄바꿈 금지 및 여백 최적화 */
@@ -268,8 +271,8 @@ else:
 
         st.write(post["caption"])
         
-        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 ([1, 1, 2] 비율로 넉넉하게 배치)
-        col_btn1, col_btn2, _ = st.columns([1, 1, 2])
+        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 (CSS에 의해 컬럼이 크기에 딱 맞춰 정렬됨)
+        col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
             show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
         with col_btn2:
