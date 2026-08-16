@@ -29,7 +29,7 @@ st.markdown("""
 
 /* 2. 버튼 내부 글자 줄바꿈 금지 및 여백 최적화 */
 div[data-testid="stButton"] button {
-    padding: 2px 6px !important;
+    padding: 2px 8px !important;
     min-height: 34px !important;
     white-space: nowrap !important;
     word-break: keep-all !important;
@@ -270,14 +270,23 @@ else:
 
         st.write(post["caption"])
         
-        # --- ❤️ 표정 이모티콘 반응 영역 (총 6종 한 줄 배치) ---
+        # --- ❤️ 표정 이모티콘 반응 영역 (선택된 반응 + ➕ 추가 버튼) ---
         reactions = post.get("reactions", {})
-        r_cols = st.columns(6)
-        for e_idx, emoji in enumerate(EMOJI_LIST):
+        active_emojis = [e for e in EMOJI_LIST if reactions.get(e, 0) > 0]
+        
+        if f"show_picker_{p_id}" not in st.session_state:
+            st.session_state[f"show_picker_{p_id}"] = False
+
+        # 선택된 반응들과 ➕ 버튼을 좌측에 나란히 정렬
+        num_active = len(active_emojis)
+        r_ratios = [1] * (num_active + 1) + [max(6 - (num_active + 1), 1)]
+        r_cols = st.columns(r_ratios)
+
+        # 1) 활성화된 이모티콘 버튼 출력
+        for e_idx, emoji in enumerate(active_emojis):
             count = reactions.get(emoji, 0)
-            btn_text = f"{emoji} {count}" if count > 0 else emoji
             with r_cols[e_idx]:
-                if st.button(btn_text, key=f"react_{emoji}_{p_id}_{idx}"):
+                if st.button(f"{emoji} {count}", key=f"active_react_{emoji}_{p_id}_{idx}"):
                     for original_post in posts:
                         if original_post.get("id") == post.get("id"):
                             if "reactions" not in original_post:
@@ -286,6 +295,28 @@ else:
                             break
                     save_posts(posts, posts_file_id)
                     st.rerun()
+
+        # 2) ➕ 반응 추가 버튼
+        with r_cols[num_active]:
+            if st.button("➕", key=f"btn_add_react_{p_id}_{idx}"):
+                st.session_state[f"show_picker_{p_id}"] = not st.session_state[f"show_picker_{p_id}"]
+                st.rerun()
+
+        # 3) ➕ 클릭 시 아래에 펼쳐지는 이모티콘 선택기 (6종)
+        if st.session_state[f"show_picker_{p_id}"]:
+            picker_cols = st.columns(6)
+            for e_idx, emoji in enumerate(EMOJI_LIST):
+                with picker_cols[e_idx]:
+                    if st.button(emoji, key=f"pick_{emoji}_{p_id}_{idx}"):
+                        for original_post in posts:
+                            if original_post.get("id") == post.get("id"):
+                                if "reactions" not in original_post:
+                                    original_post["reactions"] = {e: 0 for e in EMOJI_LIST}
+                                original_post["reactions"][emoji] = original_post["reactions"].get(emoji, 0) + 1
+                                break
+                        st.session_state[f"show_picker_{p_id}"] = False
+                        save_posts(posts, posts_file_id)
+                        st.rerun()
 
         # ✏️ 수정 / 🗑️ 삭제 버튼 영역 ([1, 1, 2] 비율)
         col_btn1, col_btn2, _ = st.columns([1, 1, 2])
