@@ -187,26 +187,28 @@ else:
     for idx, post in enumerate(posts):
         st.markdown(f"**{post['author']}** · `{post['date']}`")
         try:
-            # 메모리 충돌(Segmentation Fault)을 방지하기 위해 PIL Image로 변환
+            # 메모리 Segfault 방지: BytesIO -> PIL Image -> 안전한 width 설정
             img_bytes = download_file_from_drive(post["photo_id"])
             image_obj = Image.open(io.BytesIO(img_bytes))
-            st.image(image_obj, use_container_width=True)
-        except Exception as e:
+            st.image(image_obj, width="stretch")
+        except Exception:
             st.warning("🖼️ 사진을 불러오는 중 오류가 발생했습니다.")
             
         st.write(post["caption"])
         
-        # 관리 아코디언 메뉴
+        # 고유 ID 생성 (Key 충돌 방지)
+        post_key = post.get("photo_id", str(idx))
+        
         with st.expander("⚙️ 게시글 관리"):
             # 1. 글 수정
             st.markdown("**:pencil2: 글 수정하기**")
             authors_list = ["아빠", "엄마", "첫째", "둘째"]
             curr_author_idx = authors_list.index(post['author']) if post['author'] in authors_list else 0
             
-            edit_author = st.selectbox("작성자 변경", authors_list, index=curr_author_idx, key=f"edit_auth_{idx}")
-            edit_caption = st.text_area("글 내용 수정", value=post["caption"], key=f"edit_cap_{idx}")
+            edit_author = st.selectbox("작성자 변경", authors_list, index=curr_author_idx, key=f"auth_{post_key}")
+            edit_caption = st.text_area("글 내용 수정", value=post["caption"], key=f"cap_{post_key}")
             
-            if st.button("수정 저장", key=f"btn_save_{idx}"):
+            if st.button("수정 저장", key=f"btn_save_{post_key}"):
                 posts[idx]["author"] = edit_author
                 posts[idx]["caption"] = edit_caption
                 save_posts_to_drive(posts, posts_file_id)
@@ -217,7 +219,7 @@ else:
             
             # 2. 글 삭제
             st.markdown("**:wastebasket: 글 삭제하기**")
-            if st.button("🗑️ 게시글 및 사진 영구 삭제", key=f"btn_del_{idx}"):
+            if st.button("🗑️ 게시글 및 사진 영구 삭제", key=f"btn_del_{post_key}"):
                 delete_file_from_drive(post["photo_id"])
                 posts.pop(idx)
                 save_posts_to_drive(posts, posts_file_id)
