@@ -10,7 +10,38 @@ import io
 
 # 앱 기본 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
+
+# --- 1. 가족 전용 비밀번호(PIN 6자리) 잠금 화면 ---
+FAMILY_PIN = st.secrets.get("FAMILY_PIN", "123456")
+
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+
+if not st.session_state["authenticated"]:
+    st.title("🔒 우리 가족 전용 공간")
+    st.write("가족 전용 비밀번호(PIN 6자리)를 입력해 주세요.")
+    
+    with st.form("login_form"):
+        pin_input = st.text_input("비밀번호 6자리", type="password", max_chars=6)
+        submit_pin = st.form_submit_button("접속하기")
+        
+        if submit_pin:
+            if pin_input == FAMILY_PIN:
+                st.session_state["authenticated"] = True
+                st.success("확인되었습니다!")
+                st.rerun()
+            else:
+                st.error("비밀번호가 올바르지 않습니다. 다시 입력해 주세요.")
+    st.stop()
+
+# --- 2. 인증 완료 후 메인 앱 화면 ---
 st.title("❤️ 우리 가족 파이썬 기록장")
+
+col_title, col_logout = st.columns([4, 1])
+with col_logout:
+    if st.button("🔒 잠그기"):
+        st.session_state["authenticated"] = False
+        st.rerun()
 
 # --- Google OAuth 2.0 사용자 인증 연동 설정 ---
 SCOPES = ['https://www.googleapis.com/auth/drive']
@@ -29,7 +60,6 @@ def get_drive_service():
         scopes=SCOPES
     )
     
-    # 토큰 자동 갱신
     if not creds.valid:
         creds.refresh(Request())
         
@@ -42,9 +72,8 @@ except Exception as e:
     st.error(f"Google Drive 연결 설정에 실패했습니다: {e}")
     st.stop()
 
-# --- 구글 드라이브 파일 읽기/쓰기 도우미 함수 ---
+# --- 구글 드라이브 파일 읽기/쓰기/삭제 도우미 함수 ---
 def upload_file_to_drive(file_bytes, file_name, mime_type):
-    """내 구글 원 2TB 드라이브 폴더로 사진 직접 업로드"""
     file_metadata = {
         'name': file_name,
         'parents': [FOLDER_ID]
@@ -61,7 +90,6 @@ def upload_file_to_drive(file_bytes, file_name, mime_type):
     return uploaded_file.get('id')
 
 def download_file_from_drive(file_id):
-    """내 구글 드라이브에서 파일 바이트 데이터 가져오기"""
     request = drive_service.files().get_media(fileId=file_id)
     fh = io.BytesIO()
     downloader = MediaIoBaseDownload(fh, request)
@@ -70,8 +98,14 @@ def download_file_from_drive(file_id):
         _, done = downloader.next_chunk()
     return fh.getvalue()
 
+def delete_file_from_drive(file_id):
+    """구글 드라이브에서 특정 파일(사진) 삭제"""
+    try:
+        drive_service.files().delete(fileId=file_id).execute()
+    except Exception:
+        pass  # 이미 삭제되었거나 휴지통에 있는 경우 예외 무시
+
 def load_posts_from_drive():
-    """내 구글 드라이브에서 posts.json 파일 찾아 게시글 목록 불러오기"""
     try:
         query = f"'{FOLDER_ID}' in parents and name = 'posts.json' and trashed = false"
         results = drive_service.files().list(q=query, fields="files(id)").execute()
@@ -88,7 +122,6 @@ def load_posts_from_drive():
         return [], None
 
 def save_posts_to_drive(posts, existing_file_id=None):
-    """게시글 목록을 json으로 변환하여 내 구글 드라이브에 저장"""
     json_bytes = json.dumps(posts, ensure_ascii=False, indent=2).encode('utf-8')
     fh = io.BytesIO(json_bytes)
     media = MediaIoBaseUpload(fh, mimetype='application/json', resumable=False)
@@ -106,10 +139,10 @@ def save_posts_to_drive(posts, existing_file_id=None):
 # --- 게시물 데이터 불러오기 ---
 posts, posts_file_id = load_posts_from_drive()
 
-# --- 1. 사진 및 글 업로드 폼 ---
+# --- 3. 사진 및 글 업로드 폼 ---
 st.subheader("📸 새 기록 남기기")
 with st.form("upload_form", clear_on_submit=True):
-    author = st.selectbox("작성자", ["아빠", "엄마", "첫째", "둘째"])
+    author = st.selectbox("작성자", ["CH", "JW", "CY", "SY"])
     photo = st.file_uploader("사진을 선택하세요", type=["jpg", "jpeg", "png", "heic", "webp"])
     caption = st.text_area("오늘 어떤 일이 있었나요?")
     submitted = st.form_submit_button("가족 기록 올리기")
@@ -122,12 +155,10 @@ with st.form("upload_form", clear_on_submit=True):
                     photo_name = f"{timestamp}_{photo.name}"
                     mime_type = photo.type if photo.type else 'image/jpeg'
                     
-                    # 1. 내 구글 드라이브에 사진 업로드
                     photo_drive_id = upload_file_to_drive(
                         photo.getvalue(), photo_name, mime_type
                     )
                     
-                    # 2. 새 포스트 데이터 생성
                     new_post = {
                         "author": author,
                         "photo_id": photo_drive_id,
@@ -135,7 +166,6 @@ with st.form("upload_form", clear_on_submit=True):
                         "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
                     }
                     
-                    # 3. 최신 포스트를 맨 앞에 추가 후 내 구글 드라이브에 저장
                     posts.insert(0, new_post)
                     save_posts_to_drive(posts, posts_file_id)
                     
@@ -148,19 +178,53 @@ with st.form("upload_form", clear_on_submit=True):
 
 st.divider()
 
-# --- 2. 가족 타임라인 피드 ---
+# --- 4. 가족 타임라인 피드 (수정 & 삭제 기능 포함) ---
 st.subheader("📖 가족 타임라인")
 
 if not posts:
     st.info("아직 등록된 기록이 없습니다. 위에서 첫 번째 가족 추억을 남겨보세요!")
 else:
-    for post in posts:
+    for idx, post in enumerate(posts):
         st.markdown(f"**{post['author']}** · `{post['date']}`")
         try:
-            # 내 구글 드라이브에서 사진 데이터 가져와서 표시
             img_bytes = download_file_from_drive(post["photo_id"])
             st.image(img_bytes, use_container_width=True)
         except Exception:
             st.warning("🖼️ 사진을 불러오는 중 오류가 발생했습니다.")
         st.write(post["caption"])
+        
+        # --- 게시글 수정/삭제 아코디언 메뉴 ---
+        with st.expander("⚙️ 게시글 관리"):
+            tab_edit, tab_delete = st.tabs(["✏️ 글 수정", "🗑️ 글 삭제"])
+            
+            # 1. 수정 탭
+            with tab_edit:
+                with st.form(f"edit_form_{idx}"):
+                    authors_list = ["아빠", "엄마", "첫째", "둘째"]
+                    current_author_idx = authors_list.index(post['author']) if post['author'] in authors_list else 0
+                    
+                    new_author = st.selectbox("작성자 변경", authors_list, index=current_author_idx, key=f"author_{idx}")
+                    new_caption = st.text_area("글 내용 수정", value=post["caption"], key=f"caption_{idx}")
+                    submit_edit = st.form_submit_button("수정 저장")
+                    
+                    if submit_edit:
+                        posts[idx]["author"] = new_author
+                        posts[idx]["caption"] = new_caption
+                        save_posts_to_drive(posts, posts_file_id)
+                        st.success("게시글이 수정되었습니다!")
+                        st.rerun()
+            
+            # 2. 삭제 탭
+            with tab_delete:
+                st.warning("이 게시글과 사진을 구글 드라이브에서 영구 삭제하시겠습니까?")
+                if st.button("🗑️ 정말 삭제하기", key=f"del_btn_{idx}"):
+                    # 구글 드라이브에서 사진 파일 삭제
+                    delete_file_from_drive(post["photo_id"])
+                    # posts 목록에서 해당 게시글 제거
+                    posts.pop(idx)
+                    # posts.json 신규 상태로 저장
+                    save_posts_to_drive(posts, posts_file_id)
+                    st.success("게시글과 사진이 영구 삭제되었습니다.")
+                    st.rerun()
+                    
         st.divider()
