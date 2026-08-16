@@ -12,21 +12,25 @@ import io
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 버튼 나란히 정렬 CSS 추가 ---
+# --- 🎨 모바일 세로 꺾임 방지 & PC 간격 밀착 CSS ---
 st.markdown("""
 <style>
-/* 수정/삭제 버튼이 데스크톱/모바일 모두에서 간격 없이 나란히 정렬되도록 설정 */
-div[data-testid="stHorizontalBlock"]:has(button[key*="btn_show_edit_"]) {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: flex-start !important;
-    gap: 8px !important;
+/* 1. 모바일 화면(640px 이하)에서 Streamlit 컬럼이 밑으로 떨어지지 않도록 강제 가로 배치 */
+@media (max-width: 640px) {
+    div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 6px !important;
+    }
+    div[data-testid="stColumn"] {
+        min-width: 0 !important;
+    }
 }
-div[data-testid="stHorizontalBlock"]:has(button[key*="btn_show_edit_"]) > div[data-testid="column"] {
-    width: auto !important;
-    min-width: unset !important;
-    flex: 0 0 auto !important;
+
+/* 2. 수정/삭제 버튼 내부 여백 축소로 더 깔끔하게 밀착 */
+button[key*="btn_show_edit_"], button[key*="del_"] {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -256,8 +260,8 @@ else:
 
         st.write(post["caption"])
         
-        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 (나란히 정렬)
-        col_btn1, col_btn2 = st.columns(2)
+        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 ([1, 1, 3] 비율로 좌측에 콤팩트 배치)
+        col_btn1, col_btn2, _ = st.columns([1, 1, 3])
         with col_btn1:
             show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
         with col_btn2:
