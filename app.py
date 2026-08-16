@@ -20,7 +20,7 @@ st.markdown("""
     div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 8px !important;
+        gap: 4px !important;
     }
     div[data-testid="stColumn"] {
         min-width: 0 !important;
@@ -29,8 +29,8 @@ st.markdown("""
 
 /* 2. 버튼 내부 글자 줄바꿈 금지 및 여백 최적화 */
 div[data-testid="stButton"] button {
-    padding: 4px 12px !important;
-    min-height: 38px !important;
+    padding: 2px 6px !important;
+    min-height: 34px !important;
     white-space: nowrap !important;
     word-break: keep-all !important;
 }
@@ -38,12 +38,13 @@ div[data-testid="stButton"] button {
 div[data-testid="stButton"] button p {
     white-space: nowrap !important;
     word-break: keep-all !important;
-    font-size: 14px !important;
+    font-size: 13px !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
+EMOJI_LIST = ["❤️", "👍", "😊", "🎉", "😖", "😭"]
 
 # --- 1. 가족 전용 비밀번호(PIN) 인증 ---
 FAMILY_PIN = st.secrets.get("FAMILY_PIN", "123456")
@@ -205,7 +206,8 @@ if st.session_state["show_upload_form"]:
                             "photo_ids": photo_ids,
                             "caption": caption,
                             "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M"),
-                            "comments": []
+                            "comments": [],
+                            "reactions": {e: 0 for e in EMOJI_LIST}
                         }
                         posts.insert(0, new_post)
                         save_posts(posts, posts_file_id)
@@ -268,7 +270,24 @@ else:
 
         st.write(post["caption"])
         
-        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 ([1, 1, 2] 비율로 넉넉하게 배치)
+        # --- ❤️ 표정 이모티콘 반응 영역 (총 6종 한 줄 배치) ---
+        reactions = post.get("reactions", {})
+        r_cols = st.columns(6)
+        for e_idx, emoji in enumerate(EMOJI_LIST):
+            count = reactions.get(emoji, 0)
+            btn_text = f"{emoji} {count}" if count > 0 else emoji
+            with r_cols[e_idx]:
+                if st.button(btn_text, key=f"react_{emoji}_{p_id}_{idx}"):
+                    for original_post in posts:
+                        if original_post.get("id") == post.get("id"):
+                            if "reactions" not in original_post:
+                                original_post["reactions"] = {e: 0 for e in EMOJI_LIST}
+                            original_post["reactions"][emoji] = original_post["reactions"].get(emoji, 0) + 1
+                            break
+                    save_posts(posts, posts_file_id)
+                    st.rerun()
+
+        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 ([1, 1, 2] 비율)
         col_btn1, col_btn2, _ = st.columns([1, 1, 2])
         with col_btn1:
             show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
