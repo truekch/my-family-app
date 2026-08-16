@@ -12,6 +12,25 @@ import io
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
+# --- 🎨 버튼 나란히 정렬 CSS 추가 ---
+st.markdown("""
+<style>
+/* 수정/삭제 버튼이 데스크톱/모바일 모두에서 간격 없이 나란히 정렬되도록 설정 */
+div[data-testid="stHorizontalBlock"]:has(button[key*="btn_show_edit_"]) {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+}
+div[data-testid="stHorizontalBlock"]:has(button[key*="btn_show_edit_"]) > div[data-testid="column"] {
+    width: auto !important;
+    min-width: unset !important;
+    flex: 0 0 auto !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
 
 # --- 1. 가족 전용 비밀번호(PIN) 인증 ---
@@ -136,7 +155,6 @@ with col_head2:
 
 posts, posts_file_id = load_posts()
 
-# 작성 폼 열림/닫힘 세션 상태
 if "show_upload_form" not in st.session_state:
     st.session_state["show_upload_form"] = False
 
@@ -146,7 +164,7 @@ with col_btn_new:
     if st.button("📸 새 기록 남기기", key="toggle_upload_btn", use_container_width=True):
         st.session_state["show_upload_form"] = not st.session_state["show_upload_form"]
 
-# 📸 새 기록 남기기 작성 폼 (버튼 누를 때만 펼쳐짐)
+# 📸 새 기록 남기기 작성 폼
 if st.session_state["show_upload_form"]:
     with st.form("upload_form", clear_on_submit=True):
         st.subheader("✏️ 새로운 추억 남기기")
@@ -179,7 +197,7 @@ if st.session_state["show_upload_form"]:
                         }
                         posts.insert(0, new_post)
                         save_posts(posts, posts_file_id)
-                        st.session_state["show_upload_form"] = False  # 등록 후 폼 닫기
+                        st.session_state["show_upload_form"] = False
                         st.success("🎉 영구 저장되었습니다!")
                         st.rerun()
                     except Exception as e:
@@ -192,14 +210,12 @@ st.divider()
 # 📖 가족 타임라인 피드 & 🔍 검색 필터 영역
 st.subheader("📖 가족 타임라인")
 
-# 🔍 검색 & 필터 바
 search_col1, search_col2 = st.columns([1, 2])
 with search_col1:
     filter_author = st.selectbox("👤 작성자 필터", ["전체"] + FAMILY_MEMBERS, key="filter_author")
 with search_col2:
     search_keyword = st.text_input("🔍 글 내용 검색어", placeholder="찾고 싶은 키워드 입력...", key="search_keyword")
 
-# 게시물 검색 조건 적용
 filtered_posts = []
 for post in posts:
     author_match = (filter_author == "전체") or (post["author"] == filter_author)
@@ -221,7 +237,6 @@ else:
         p_id = post.get("id", str(idx))
         st.markdown(f"**{post['author']}** · `{post['date']}`")
         
-        # 다중 사진 및 호환성 처리
         p_ids = post.get("photo_ids", [])
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
@@ -241,8 +256,8 @@ else:
 
         st.write(post["caption"])
         
-        # 수정 및 삭제 버튼 영역
-        col_btn1, col_btn2, _ = st.columns([1, 1, 2])
+        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 (나란히 정렬)
+        col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
             show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
         with col_btn2:
