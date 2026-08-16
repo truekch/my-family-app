@@ -12,26 +12,32 @@ import io
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 PC & 모바일 버튼 완벽 밀착 CSS ---
+# --- 🎨 버튼 텍스트 줄바꿈 방지 & 모바일 최적화 CSS ---
 st.markdown("""
 <style>
-/* 1. 모바일 화면(640px 이하)에서 컬럼이 밑으로 떨어지는 Streamlit 기본 동작 차단 */
+/* 1. 모바일에서 컬럼이 세로로 꺾이지 않고 가로 유지 */
 @media (max-width: 640px) {
     div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
+        gap: 8px !important;
     }
     div[data-testid="stColumn"] {
         min-width: 0 !important;
-        flex: 1 1 auto !important;
     }
 }
 
-/* 2. 모든 버튼 글자 줄바꿈 금지 및 깔끔한 패딩 설정 */
+/* 2. 버튼 내부 글자 줄바꿈 금지 및 여백 최적화 */
 div[data-testid="stButton"] button {
+    padding: 4px 12px !important;
+    min-height: 38px !important;
     white-space: nowrap !important;
     word-break: keep-all !important;
-    padding: 4px 10px !important;
+}
+
+div[data-testid="stButton"] button p {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
     font-size: 14px !important;
 }
 </style>
@@ -262,8 +268,8 @@ else:
 
         st.write(post["caption"])
         
-        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 (1:1:3 비율로 좌측 밀착)
-        col_btn1, col_btn2, _ = st.columns([1, 1, 3])
+        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 ([1, 1, 2] 비율로 넉넉하게 배치)
+        col_btn1, col_btn2, _ = st.columns([1, 1, 2])
         with col_btn1:
             show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
         with col_btn2:
