@@ -7,6 +7,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
+from PIL import Image
 
 # 앱 기본 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
@@ -99,11 +100,10 @@ def download_file_from_drive(file_id):
     return fh.getvalue()
 
 def delete_file_from_drive(file_id):
-    """구글 드라이브에서 특정 파일(사진) 삭제"""
     try:
         drive_service.files().delete(fileId=file_id).execute()
     except Exception:
-        pass  # 이미 삭제되었거나 휴지통에 있는 경우 예외 무시
+        pass
 
 def load_posts_from_drive():
     try:
@@ -142,7 +142,7 @@ posts, posts_file_id = load_posts_from_drive()
 # --- 3. 사진 및 글 업로드 폼 ---
 st.subheader("📸 새 기록 남기기")
 with st.form("upload_form", clear_on_submit=True):
-    author = st.selectbox("작성자", ["CH", "JW", "CY", "SY"])
+    author = st.selectbox("작성자", ["아빠", "엄마", "첫째", "둘째"])
     photo = st.file_uploader("사진을 선택하세요", type=["jpg", "jpeg", "png", "heic", "webp"])
     caption = st.text_area("오늘 어떤 일이 있었나요?")
     submitted = st.form_submit_button("가족 기록 올리기")
@@ -178,7 +178,7 @@ with st.form("upload_form", clear_on_submit=True):
 
 st.divider()
 
-# --- 4. 가족 타임라인 피드 (수정 & 삭제 기능 포함) ---
+# --- 4. 가족 타임라인 피드 ---
 st.subheader("📖 가족 타임라인")
 
 if not posts:
@@ -187,44 +187,41 @@ else:
     for idx, post in enumerate(posts):
         st.markdown(f"**{post['author']}** · `{post['date']}`")
         try:
+            # 메모리 충돌(Segmentation Fault)을 방지하기 위해 PIL Image로 변환
             img_bytes = download_file_from_drive(post["photo_id"])
-            st.image(img_bytes, use_container_width=True)
-        except Exception:
+            image_obj = Image.open(io.BytesIO(img_bytes))
+            st.image(image_obj, use_container_width=True)
+        except Exception as e:
             st.warning("🖼️ 사진을 불러오는 중 오류가 발생했습니다.")
+            
         st.write(post["caption"])
         
-        # --- 게시글 수정/삭제 아코디언 메뉴 ---
+        # 관리 아코디언 메뉴
         with st.expander("⚙️ 게시글 관리"):
-            tab_edit, tab_delete = st.tabs(["✏️ 글 수정", "🗑️ 글 삭제"])
+            # 1. 글 수정
+            st.markdown("**:pencil2: 글 수정하기**")
+            authors_list = ["아빠", "엄마", "첫째", "둘째"]
+            curr_author_idx = authors_list.index(post['author']) if post['author'] in authors_list else 0
             
-            # 1. 수정 탭
-            with tab_edit:
-                with st.form(f"edit_form_{idx}"):
-                    authors_list = ["아빠", "엄마", "첫째", "둘째"]
-                    current_author_idx = authors_list.index(post['author']) if post['author'] in authors_list else 0
-                    
-                    new_author = st.selectbox("작성자 변경", authors_list, index=current_author_idx, key=f"author_{idx}")
-                    new_caption = st.text_area("글 내용 수정", value=post["caption"], key=f"caption_{idx}")
-                    submit_edit = st.form_submit_button("수정 저장")
-                    
-                    if submit_edit:
-                        posts[idx]["author"] = new_author
-                        posts[idx]["caption"] = new_caption
-                        save_posts_to_drive(posts, posts_file_id)
-                        st.success("게시글이 수정되었습니다!")
-                        st.rerun()
+            edit_author = st.selectbox("작성자 변경", authors_list, index=curr_author_idx, key=f"edit_auth_{idx}")
+            edit_caption = st.text_area("글 내용 수정", value=post["caption"], key=f"edit_cap_{idx}")
             
-            # 2. 삭제 탭
-            with tab_delete:
-                st.warning("이 게시글과 사진을 구글 드라이브에서 영구 삭제하시겠습니까?")
-                if st.button("🗑️ 정말 삭제하기", key=f"del_btn_{idx}"):
-                    # 구글 드라이브에서 사진 파일 삭제
-                    delete_file_from_drive(post["photo_id"])
-                    # posts 목록에서 해당 게시글 제거
-                    posts.pop(idx)
-                    # posts.json 신규 상태로 저장
-                    save_posts_to_drive(posts, posts_file_id)
-                    st.success("게시글과 사진이 영구 삭제되었습니다.")
-                    st.rerun()
+            if st.button("수정 저장", key=f"btn_save_{idx}"):
+                posts[idx]["author"] = edit_author
+                posts[idx]["caption"] = edit_caption
+                save_posts_to_drive(posts, posts_file_id)
+                st.success("수정되었습니다!")
+                st.rerun()
+            
+            st.divider()
+            
+            # 2. 글 삭제
+            st.markdown("**:wastebasket: 글 삭제하기**")
+            if st.button("🗑️ 게시글 및 사진 영구 삭제", key=f"btn_del_{idx}"):
+                delete_file_from_drive(post["photo_id"])
+                posts.pop(idx)
+                save_posts_to_drive(posts, posts_file_id)
+                st.success("삭제되었습니다!")
+                st.rerun()
                     
         st.divider()
