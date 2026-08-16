@@ -136,7 +136,7 @@ with col_head2:
 
 posts, posts_file_id = load_posts()
 
-# 📸 새 기록 남기기 폼 (사진 선택은 권장, 글만 등록도 가능)
+# 📸 새 기록 남기기 폼
 st.subheader("📸 새 기록 남기기")
 with st.form("upload_form", clear_on_submit=True):
     author = st.selectbox("작성자", FAMILY_MEMBERS)
@@ -151,7 +151,6 @@ with st.form("upload_form", clear_on_submit=True):
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     photo_id = None
                     
-                    # 사진이 들어왔을 때만 업로드 진행
                     if photo is not None:
                         photo_name = f"{timestamp}_{photo.name}"
                         mime_type = photo.type if photo.type else 'image/jpeg'
@@ -162,7 +161,8 @@ with st.form("upload_form", clear_on_submit=True):
                         "author": author,
                         "photo_id": photo_id,
                         "caption": caption,
-                        "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M")
+                        "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M"),
+                        "comments": []  # 댓글 데이터 배열 초기화
                     }
                     posts.insert(0, new_post)
                     save_posts(posts, posts_file_id)
@@ -175,17 +175,39 @@ with st.form("upload_form", clear_on_submit=True):
 
 st.divider()
 
-# 📖 가족 타임라인 피드
+# 📖 가족 타임라인 피드 & 🔍 검색 필터 영역
 st.subheader("📖 가족 타임라인")
 
-if not posts:
-    st.info("아직 등록된 기록이 없습니다. 첫 번째 추억을 올려보세요!")
+# 🔍 검색 & 필터 바
+search_col1, search_col2 = st.columns([1, 2])
+with search_col1:
+    filter_author = st.selectbox("👤 작성자 필터", ["전체"] + FAMILY_MEMBERS, key="filter_author")
+with search_col2:
+    search_keyword = st.text_input("🔍 글 내용 검색어", placeholder="찾고 싶은 키워드 입력...", key="search_keyword")
+
+# 게시물 검색 조건 적용
+filtered_posts = []
+for post in posts:
+    author_match = (filter_author == "전체") or (post["author"] == filter_author)
+    keyword_match = (not search_keyword.strip()) or (search_keyword.strip().lower() in post["caption"].lower())
+    
+    if author_match and keyword_match:
+        filtered_posts.append(post)
+
+if filter_author != "전체" or search_keyword.strip():
+    st.caption(f"🔎 검색 결과: 총 **{len(filtered_posts)}개**의 기록을 찾았습니다.")
+
+if not filtered_posts:
+    if not posts:
+        st.info("아직 등록된 기록이 없습니다. 첫 번째 추억을 올려보세요!")
+    else:
+        st.info("조건에 일치하는 기록이 없습니다.")
 else:
-    for idx, post in enumerate(posts):
+    for idx, post in enumerate(filtered_posts):
         p_id = post.get("id", str(idx))
         st.markdown(f"**{post['author']}** · `{post['date']}`")
         
-        # 사진이 있는 게시물만 이미지 표시
+        # 사진 표시
         if post.get("photo_id"):
             b64_str = download_image_b64(post["photo_id"])
             if b64_str:
@@ -203,7 +225,7 @@ else:
             if st.button("🗑️ 삭제", key=f"del_{p_id}_{idx}"):
                 if post.get("photo_id"):
                     delete_file_from_drive(post["photo_id"])
-                posts.pop(idx)
+                posts = [p for p in posts if p.get("id") != post.get("id")]
                 save_posts(posts, posts_file_id)
                 st.success("삭제되었습니다!")
                 st.rerun()
@@ -225,11 +247,52 @@ else:
                 new_caption = st.text_area("글 내용", value=post["caption"], key=f"edit_cap_{p_id}")
                 
                 if st.button("수정 저장하기", key=f"save_edit_{p_id}"):
-                    posts[idx]["author"] = new_author
-                    posts[idx]["caption"] = new_caption
+                    for original_post in posts:
+                        if original_post.get("id") == post.get("id"):
+                            original_post["author"] = new_author
+                            original_post["caption"] = new_caption
+                            break
                     save_posts(posts, posts_file_id)
                     st.session_state[f"editing_{p_id}"] = False
                     st.success("수정 완료!")
                     st.rerun()
+
+        # --- 💬 댓글 영역 ---
+        comments = post.get("comments", [])
+        with st.expander(f"💬 댓글 ({len(comments)}개)"):
+            # 기존 댓글 목록 표시
+            if comments:
+                for c in comments:
+                    st.markdown(f"**{c['author']}** (`{c['date']}`)")
+                    st.write(c['text'])
+                    st.markdown("---")
+            else:
+                st.caption("아직 댓글이 없습니다. 첫 번째 댓글을 남겨보세요!")
+            
+            # 댓글 작성 폼
+            with st.form(f"comment_form_{p_id}", clear_on_submit=True):
+                c_author = st.selectbox("댓글 작성자", FAMILY_MEMBERS, key=f"c_auth_{p_id}")
+                c_text = st.text_input("댓글 내용을 입력하세요", key=f"c_text_{p_id}")
+                c_submit = st.form_submit_button("댓글 남기기")
+                
+                if c_submit:
+                    if c_text.strip() != "":
+                        new_comment = {
+                            "author": c_author,
+                            "text": c_text,
+                            "date": datetime.now().strftime("%m/%d %H:%M")
+                        }
+                        # 원본 게시물 데이터에 댓글 추가
+                        for original_post in posts:
+                            if original_post.get("id") == post.get("id"):
+                                if "comments" not in original_post:
+                                    original_post["comments"] = []
+                                original_post["comments"].append(new_comment)
+                                break
+                        save_posts(posts, posts_file_id)
+                        st.success("댓글이 등록되었습니다!")
+                        st.rerun()
+                    else:
+                        st.warning("댓글 내용을 입력해 주세요.")
             
         st.divider()
