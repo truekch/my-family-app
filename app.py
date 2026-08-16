@@ -136,33 +136,36 @@ with col_head2:
 
 posts, posts_file_id = load_posts()
 
-# 📸 새 기록 남기기 폼
+# 📸 새 기록 남기기 폼 (다중 사진 선택 가능 accept_multiple_files=True)
 st.subheader("📸 새 기록 남기기")
 with st.form("upload_form", clear_on_submit=True):
     author = st.selectbox("작성자", FAMILY_MEMBERS)
-    photo = st.file_uploader("사진 선택 (선택 사항)", type=["jpg", "jpeg", "png", "heic", "webp"])
+    photos = st.file_uploader("사진 선택 (여러 장 가능, 선택 사항)", type=["jpg", "jpeg", "png", "heic", "webp"], accept_multiple_files=True)
     caption = st.text_area("오늘 어떤 일이 있었나요?")
     submitted = st.form_submit_button("가족 기록 올리기")
 
     if submitted:
         if caption.strip() != "":
-            with st.spinner("내 구글 원 2TB 드라이브로 저장 중..."):
+            with st.spinner("내 구글 원 2TB 드라이브로 사진 전송 중..."):
                 try:
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                    photo_id = None
+                    photo_ids = []
                     
-                    if photo is not None:
-                        photo_name = f"{timestamp}_{photo.name}"
-                        mime_type = photo.type if photo.type else 'image/jpeg'
-                        photo_id = upload_file_to_drive(photo.getvalue(), photo_name, mime_type)
+                    # 여러 장의 사진 순차 업로드
+                    if photos:
+                        for p_idx, photo in enumerate(photos):
+                            photo_name = f"{timestamp}_{p_idx}_{photo.name}"
+                            mime_type = photo.type if photo.type else 'image/jpeg'
+                            p_id = upload_file_to_drive(photo.getvalue(), photo_name, mime_type)
+                            photo_ids.append(p_id)
                     
                     new_post = {
                         "id": timestamp,
                         "author": author,
-                        "photo_id": photo_id,
+                        "photo_ids": photo_ids,  # 다중 사진 ID 배열
                         "caption": caption,
                         "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M"),
-                        "comments": []  # 댓글 데이터 배열 초기화
+                        "comments": []
                     }
                     posts.insert(0, new_post)
                     save_posts(posts, posts_file_id)
@@ -207,14 +210,26 @@ else:
         p_id = post.get("id", str(idx))
         st.markdown(f"**{post['author']}** · `{post['date']}`")
         
-        # 사진 표시
-        if post.get("photo_id"):
-            b64_str = download_image_b64(post["photo_id"])
-            if b64_str:
-                st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
-            else:
-                st.warning("🖼️ 사진을 불러올 수 없습니다.")
+        # 이전 버전 단일 photo_id 호환성 처리 및 신규 photo_ids 배열 추출
+        p_ids = post.get("photo_ids", [])
+        if not p_ids and post.get("photo_id"):
+            p_ids = [post.get("photo_id")]
             
+        # 다중 사진 출력 (1장 / 여러 장 분기 처리)
+        if p_ids:
+            if len(p_ids) == 1:
+                b64_str = download_image_b64(p_ids[0])
+                if b64_str:
+                    st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
+            else:
+                # 2장 이상일 경우 2열 그리드로 나란히 배치
+                cols = st.columns(2)
+                for img_idx, img_id in enumerate(p_ids):
+                    b64_str = download_image_b64(img_id)
+                    if b64_str:
+                        with cols[img_idx % 2]:
+                            st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
+
         st.write(post["caption"])
         
         # 수정 및 삭제 버튼 영역
@@ -223,8 +238,9 @@ else:
             show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
         with col_btn2:
             if st.button("🗑️ 삭제", key=f"del_{p_id}_{idx}"):
-                if post.get("photo_id"):
-                    delete_file_from_drive(post["photo_id"])
+                # 연관된 모든 사진 삭제
+                for img_id in p_ids:
+                    delete_file_from_drive(img_id)
                 posts = [p for p in posts if p.get("id") != post.get("id")]
                 save_posts(posts, posts_file_id)
                 st.success("삭제되었습니다!")
@@ -257,10 +273,9 @@ else:
                     st.success("수정 완료!")
                     st.rerun()
 
-        # --- 💬 댓글 영역 ---
+        # 💬 댓글 영역
         comments = post.get("comments", [])
         with st.expander(f"💬 댓글 ({len(comments)}개)"):
-            # 기존 댓글 목록 표시
             if comments:
                 for c in comments:
                     st.markdown(f"**{c['author']}** (`{c['date']}`)")
@@ -269,7 +284,6 @@ else:
             else:
                 st.caption("아직 댓글이 없습니다. 첫 번째 댓글을 남겨보세요!")
             
-            # 댓글 작성 폼
             with st.form(f"comment_form_{p_id}", clear_on_submit=True):
                 c_author = st.selectbox("댓글 작성자", FAMILY_MEMBERS, key=f"c_auth_{p_id}")
                 c_text = st.text_input("댓글 내용을 입력하세요", key=f"c_text_{p_id}")
@@ -282,7 +296,6 @@ else:
                             "text": c_text,
                             "date": datetime.now().strftime("%m/%d %H:%M")
                         }
-                        # 원본 게시물 데이터에 댓글 추가
                         for original_post in posts:
                             if original_post.get("id") == post.get("id"):
                                 if "comments" not in original_post:
