@@ -8,6 +8,7 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
+from PIL import Image, ImageOps
 
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
@@ -41,13 +42,13 @@ div[data-testid="stButton"] button p {
     font-size: 14px !important;
 }
 
-/* 3. 사진에 마우스 커서 호버 효과 (클릭할 수 있음을 표시) */
-.clickable-img {
+/* 3. 사진 클릭 가능한 커서 안내 */
+.img-expandable summary {
+    list-style: none;
     cursor: pointer;
-    transition: transform 0.2s ease-in-out;
 }
-.clickable-img:hover {
-    transform: scale(1.01);
+.img-expandable summary::-webkit-details-marker {
+    display: none;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -98,10 +99,10 @@ except Exception as e:
     st.error(f"Google Drive 연결 실패: {e}")
     st.stop()
 
-# --- 3. 구글 드라이브 캐싱 지원 함수 ---
+# --- 3. 구글 드라이브 캐싱 & EXIF 자동 회전 보정 함수 ---
 @st.cache_data(ttl=3600, show_spinner=False)
 def download_image_b64(file_id):
-    """드라이브에서 이미지를 받아와 Base64로 변환 후 캐싱(1시간)"""
+    """드라이브에서 이미지를 받아와 EXIF 자동 회전 보정 후 Base64로 변환하여 캐싱(1시간)"""
     if not file_id:
         return None
     try:
@@ -112,7 +113,14 @@ def download_image_b64(file_id):
         while not done:
             _, done = downloader.next_chunk()
         img_bytes = fh.getvalue()
-        return base64.b64encode(img_bytes).decode('utf-8')
+        
+        # 📸 EXIF orientation 회전 자동 보정 처리
+        img = Image.open(io.BytesIO(img_bytes))
+        img = ImageOps.exif_transpose(img)
+        
+        buffered = io.BytesIO()
+        img.save(buffered, format="JPEG")
+        return base64.b64encode(buffered.getvalue()).decode('utf-8')
     except Exception:
         return None
 
@@ -164,19 +172,6 @@ def save_posts(posts, file_id=None):
         file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
-
-# --- 🔍 사진 확대 보기 모달(Dialog) 지원 함수 ---
-@st.dialog("🔍 사진 확대 감상 & 저장")
-def view_image_modal(b64_str, photo_id):
-    img_bytes = base64.b64decode(b64_str)
-    st.image(img_bytes, use_container_width=True)
-    st.download_button(
-        label="💾 사진 다운로드 (기기에 저장)",
-        data=img_bytes,
-        file_name=f"family_photo_{photo_id}.jpg",
-        mime="image/jpeg",
-        use_container_width=True
-    )
 
 # --- 4. 메인 헤더 및 상태 초기화 ---
 col_head1, col_head2 = st.columns([3, 1])
@@ -275,22 +270,35 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
             
+        # 📸 클릭하면 바로 원본으로 펼쳐지는 사진 출력
         if p_ids:
             if len(p_ids) == 1:
                 b64_str = download_image_b64(p_ids[0])
                 if b64_str:
-                    st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="clickable-img" style="width:100%; border-radius:8px; margin-bottom:5px;">', unsafe_allow_html=True)
-                    if st.button("🔍 사진 확대 / 💾 다운로드", key=f"zoom_{p_ids[0]}_{p_id}_{idx}"):
-                        view_image_modal(b64_str, p_ids[0])
+                    st.markdown(f'''
+                    <details class="img-expandable">
+                        <summary><img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;" title="클릭하여 확대 감상"></summary>
+                        <div style="text-align:center; padding:10px 0;">
+                            <img src="data:image/jpeg;base64,{b64_str}" style="max-width:100%; border-radius:8px;">
+                            <p style="font-size:12px; color:gray; margin-top:5px;">💡 스마트폰은 사진을 길게 누르고, PC는 우클릭하여 '이미지 저장'을 눌러 다운로드하세요.</p>
+                        </div>
+                    </details>
+                    ''', unsafe_allow_html=True)
             else:
                 cols = st.columns(2)
                 for img_idx, img_id in enumerate(p_ids):
                     b64_str = download_image_b64(img_id)
                     if b64_str:
                         with cols[img_idx % 2]:
-                            st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="clickable-img" style="width:100%; border-radius:8px; margin-bottom:5px;">', unsafe_allow_html=True)
-                            if st.button(f"🔍 사진 {img_idx+1} 확대/저장", key=f"zoom_{img_id}_{p_id}_{idx}_{img_idx}"):
-                                view_image_modal(b64_str, img_id)
+                            st.markdown(f'''
+                            <details class="img-expandable">
+                                <summary><img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;" title="클릭하여 확대 감상"></summary>
+                                <div style="text-align:center; padding:10px 0;">
+                                    <img src="data:image/jpeg;base64,{b64_str}" style="max-width:100%; border-radius:8px;">
+                                    <p style="font-size:12px; color:gray; margin-top:5px;">💡 스마트폰은 사진을 길게 누르고, PC는 우클릭하여 '이미지 저장'을 눌러 다운로드하세요.</p>
+                                </div>
+                            </details>
+                            ''', unsafe_allow_html=True)
 
         st.write(post["caption"])
         
