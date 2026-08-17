@@ -13,10 +13,10 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 버튼 텍스트 줄바꿈 방지 & 사진 전체화면 CSS ---
+# --- 🎨 모바일 최적화 & 이미지 호버 CSS ---
 st.markdown("""
 <style>
-/* 1. 모바일에서 컬럼이 세로로 꺾이지 않고 가로 유지 */
+/* 1. 모바일에서 컬럼 가로 유지 */
 @media (max-width: 640px) {
     div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
@@ -42,23 +42,11 @@ div[data-testid="stButton"] button p {
     font-size: 14px !important;
 }
 
-/* 3. 사진 커서 및 전체화면 모드 스타일 */
-.expandable-img {
-    cursor: pointer;
-    transition: transform 0.2s ease-in-out;
-}
-.expandable-img:hover {
-    opacity: 0.95;
-}
-
-/* 전체화면 진입 시 검은색 배경 적용 */
-.expandable-img:-webkit-full-screen {
+/* 3. 모달 내부 이미지 중앙 정렬 및 화면 맞춤 */
+div[data-testid="stDialog"] img {
+    max-height: 75vh !important;
     object-fit: contain !important;
-    background-color: black !important;
-}
-.expandable-img:fullscreen {
-    object-fit: contain !important;
-    background-color: black !important;
+    border-radius: 8px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -124,7 +112,6 @@ def download_image_b64(file_id):
             _, done = downloader.next_chunk()
         img_bytes = fh.getvalue()
         
-        # 📸 EXIF orientation 회전 자동 보정 처리
         img = Image.open(io.BytesIO(img_bytes))
         img = ImageOps.exif_transpose(img)
         
@@ -182,6 +169,12 @@ def save_posts(posts, file_id=None):
         file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
+
+# --- 🔍 화면 맞춤 모달 팝업 ---
+@st.dialog("🖼️ 사진 확대보기")
+def show_fit_image_dialog(b64_str):
+    img_bytes = base64.b64decode(b64_str)
+    st.image(img_bytes, use_container_width=True)
 
 # --- 4. 메인 헤더 및 상태 초기화 ---
 col_head1, col_head2 = st.columns([3, 1])
@@ -266,9 +259,6 @@ for post in posts:
 if filter_author != "전체" or search_keyword.strip():
     st.caption(f"🔎 검색 결과: 총 **{len(filtered_posts)}개**의 기록을 찾았습니다.")
 
-# 사진 클릭 시 전체화면 실행 JavaScript
-ONCLICK_FULLSCREEN = "if(this.requestFullscreen){this.requestFullscreen();}else if(this.webkitRequestFullscreen){this.webkitRequestFullscreen();}"
-
 if not filtered_posts:
     if not posts:
         st.info("아직 등록된 기록이 없습니다. 상단의 [📸 새 기록 남기기] 버튼을 눌러 첫 추억을 작성해 보세요!")
@@ -283,19 +273,25 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
             
-        # 📸 사진 출력 (클릭 시 전체화면)
+        # 📸 사진 출력 (클릭 시 화면 맞춤 모달 팝업)
         if p_ids:
             if len(p_ids) == 1:
                 b64_str = download_image_b64(p_ids[0])
                 if b64_str:
-                    st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="expandable-img" style="width:100%; border-radius:8px; margin-bottom:10px;" onclick="{ONCLICK_FULLSCREEN}">', unsafe_allow_html=True)
+                    img_bytes = base64.b64decode(b64_str)
+                    st.image(img_bytes, use_container_width=True)
+                    if st.button("🔍 사진 확대보기", key=f"btn_zoom_{p_ids[0]}_{p_id}_{idx}"):
+                        show_fit_image_dialog(b64_str)
             else:
                 cols = st.columns(2)
                 for img_idx, img_id in enumerate(p_ids):
                     b64_str = download_image_b64(img_id)
                     if b64_str:
                         with cols[img_idx % 2]:
-                            st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="expandable-img" style="width:100%; border-radius:8px; margin-bottom:10px;" onclick="{ONCLICK_FULLSCREEN}">', unsafe_allow_html=True)
+                            img_bytes = base64.b64decode(b64_str)
+                            st.image(img_bytes, use_container_width=True)
+                            if st.button(f"🔍 사진 {img_idx+1} 확대", key=f"btn_zoom_{img_id}_{p_id}_{idx}_{img_idx}"):
+                                show_fit_image_dialog(b64_str)
 
         st.write(post["caption"])
         
