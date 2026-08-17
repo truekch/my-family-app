@@ -112,20 +112,13 @@ div[data-testid="stButton"] button p {
 }
 </style>
 
-<!-- 좌측 하단 회색 플로팅 버튼 (최상단 0px 이동) -->
+<!-- 좌측 하단 회색 플로팅 버튼 (최상단 0px 이동 안전 스크립트) -->
 <a href="#top_anchor" class="scroll-to-top-btn" target="_self" title="맨 위로 가기" onclick="
     try {
-        const win = window.parent || window;
-        const doc = win.document;
-        const containers = [
-            doc.querySelector('[data-testid=\'stMain\']'),
-            doc.querySelector('[data-testid=\'stAppViewContainer\']'),
-            doc.querySelector('.main'),
-            doc.documentElement,
-            doc.body
-        ];
-        containers.forEach(c => { if(c) c.scrollTop = 0; });
-        win.scrollTo(0, 0);
+        var p = window.parent.document;
+        var m = p.querySelector('section.main') || p.querySelector('.main') || p.documentElement;
+        if (m) m.scrollTop = 0;
+        window.scrollTo(0, 0);
     } catch(e) {}
 ">▲</a>
 """, unsafe_allow_html=True)
@@ -191,7 +184,6 @@ def download_image_b64(file_id):
             _, done = downloader.next_chunk()
         img_bytes = fh.getvalue()
         
-        # 📸 EXIF orientation 회전 자동 보정 처리
         img = Image.open(io.BytesIO(img_bytes))
         img = ImageOps.exif_transpose(img)
         
