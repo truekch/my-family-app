@@ -233,7 +233,7 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
-# --- 🗑️ 삭제 확인 모달 다이얼로그 (버튼 누르면 즉시 닫힘) ---
+# --- 🗑️ 삭제 확인 모달 다이얼로그 (삭제 완료 시 모달 자동 종료) ---
 @st.dialog("⚠️ 기록 삭제 확인")
 def confirm_delete_dialog(post_id, photo_ids):
     st.write("정말로 이 기록을 삭제하시겠습니까?")
@@ -246,7 +246,6 @@ def confirm_delete_dialog(post_id, photo_ids):
             updated_posts = [p for p in posts if p.get("id") != post_id]
             save_posts(updated_posts, posts_file_id)
             st.session_state[f"confirm_del_{post_id}"] = False
-            st.success("삭제되었습니다!")
             st.rerun()
     with col_no:
         if st.button("취소", key=f"cancel_del_{post_id}", use_container_width=True):
@@ -312,8 +311,8 @@ if st.session_state["show_upload_form"]:
 
 st.divider()
 
-# 📖 우리 가족 타임라인 앵커 및 시작 지점
-st.markdown('<div id="timeline_anchor" style="position:relative; top:-20px;"></div>', unsafe_allow_html=True)
+# 📖 우리 가족 타임라인 스크롤 위치 (넉넉한 상단 여백)
+st.markdown('<div id="timeline_anchor" style="position:relative; top:-100px; height:0px;"></div>', unsafe_allow_html=True)
 st.subheader("📖 우리 가족 타임라인")
 
 search_col1, search_col2 = st.columns([1, 2])
