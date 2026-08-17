@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 모바일 최적화 & 깔끔한 레이아웃 CSS ---
+# --- 🎨 모바일 최적화, 맨 위로 이동 버튼 & 순수 HTML <details> 라이트박스 CSS ---
 st.markdown("""
 <style>
 /* 1. 모바일에서 컬럼 가로 배치 유지 및 간격 조절 */
@@ -42,7 +42,30 @@ div[data-testid="stButton"] button p {
     font-size: 13px !important;
 }
 
-/* 3. 순수 HTML <details> 터치 열기/닫기 라이트박스 */
+/* 3. 좌측 하단 맨 위로 이동(▲) 플로팅 버튼 */
+.scroll-to-top {
+    position: fixed !important;
+    bottom: 25px !important;
+    left: 20px !important;
+    width: 44px !important;
+    height: 44px !important;
+    background-color: #4A5568 !important;
+    color: white !important;
+    border-radius: 50% !important;
+    text-align: center !important;
+    line-height: 44px !important;
+    font-size: 20px !important;
+    font-weight: bold !important;
+    text-decoration: none !important;
+    z-index: 99999 !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
+    transition: background-color 0.2s ease !important;
+}
+.scroll-to-top:hover {
+    background-color: #2D3748 !important;
+}
+
+/* 4. 순수 HTML <details> 터치 열기/닫기 라이트박스 */
 details.lightbox-details {
     display: block;
 }
@@ -81,6 +104,10 @@ details.lightbox-details[open] .lightbox-overlay img {
 }
 </style>
 """, unsafe_allow_html=True)
+
+# 페이지 최상단 앵커 & 좌측 하단 맨 위로 이동 플로팅 버튼
+st.markdown('<div id="top"></div>', unsafe_allow_html=True)
+st.markdown('<a href="#top" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
 
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
 
@@ -202,6 +229,27 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
+# --- 🗑️ 삭제 확인 모달 다이얼로그 ---
+@st.dialog("⚠️ 기록 삭제 확인")
+def confirm_delete_dialog(post_id, photo_ids):
+    st.write("정말로 이 기록을 삭제하시겠습니까?")
+    st.caption("삭제된 글과 사진은 복구할 수 없습니다.")
+    col_yes, col_no = st.columns(2)
+    with col_yes:
+        if st.button("네, 삭제합니다", type="primary", key=f"real_del_{post_id}", use_container_width=True):
+            for img_id in photo_ids:
+                delete_file_from_drive(img_id)
+            global posts
+            posts = [p for p in posts if p.get("id") != post_id]
+            save_posts(posts, posts_file_id)
+            st.session_state[f"confirm_del_{post_id}"] = False
+            st.success("삭제되었습니다!")
+            st.rerun()
+    with col_no:
+        if st.button("취소", key=f"cancel_del_{post_id}", use_container_width=True):
+            st.session_state[f"confirm_del_{post_id}"] = False
+            st.rerun()
+
 # --- 4. 메인 화면 상단 영역 ---
 posts, posts_file_id = load_posts()
 
@@ -301,12 +349,11 @@ else:
             with st.popover("⋮"):
                 show_edit = st.button("✏️ 수정하기", key=f"btn_show_edit_{p_id}_{idx}", use_container_width=True)
                 if st.button("🗑️ 삭제하기", key=f"del_{p_id}_{idx}", use_container_width=True):
-                    for img_id in p_ids:
-                        delete_file_from_drive(img_id)
-                    posts = [p for p in posts if p.get("id") != post.get("id")]
-                    save_posts(posts, posts_file_id)
-                    st.success("삭제되었습니다!")
-                    st.rerun()
+                    st.session_state[f"confirm_del_{p_id}"] = True
+
+        # 🗑️ 삭제 확인 모달 호출
+        if st.session_state.get(f"confirm_del_{p_id}", False):
+            confirm_delete_dialog(post.get("id"), p_ids)
 
         # 📸 순수 HTML <details> 기반 터치 확대/축소 이미지 출력
         if p_ids:
