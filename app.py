@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 모바일 최적화 & 이미지 호버 CSS ---
+# --- 🎨 모바일 최적화 & 깔끔한 버튼 레이아웃 CSS ---
 st.markdown("""
 <style>
 /* 1. 모바일에서 컬럼 가로 유지 */
@@ -40,13 +40,6 @@ div[data-testid="stButton"] button p {
     white-space: nowrap !important;
     word-break: keep-all !important;
     font-size: 14px !important;
-}
-
-/* 3. 모달 내부 이미지 중앙 정렬 및 화면 맞춤 */
-div[data-testid="stDialog"] img {
-    max-height: 75vh !important;
-    object-fit: contain !important;
-    border-radius: 8px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -112,6 +105,7 @@ def download_image_b64(file_id):
             _, done = downloader.next_chunk()
         img_bytes = fh.getvalue()
         
+        # 📸 EXIF orientation 회전 자동 보정 처리
         img = Image.open(io.BytesIO(img_bytes))
         img = ImageOps.exif_transpose(img)
         
@@ -169,12 +163,6 @@ def save_posts(posts, file_id=None):
         file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
-
-# --- 🔍 화면 맞춤 모달 팝업 ---
-@st.dialog("🖼️ 사진 확대보기")
-def show_fit_image_dialog(b64_str):
-    img_bytes = base64.b64decode(b64_str)
-    st.image(img_bytes, use_container_width=True)
 
 # --- 4. 메인 헤더 및 상태 초기화 ---
 col_head1, col_head2 = st.columns([3, 1])
@@ -273,15 +261,13 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
             
-        # 📸 사진 출력 (클릭 시 화면 맞춤 모달 팝업)
+        # 📸 사진 출력 (확대 버튼 없이 이미지 자체만 깔끔하게 출력)
         if p_ids:
             if len(p_ids) == 1:
                 b64_str = download_image_b64(p_ids[0])
                 if b64_str:
                     img_bytes = base64.b64decode(b64_str)
                     st.image(img_bytes, use_container_width=True)
-                    if st.button("🔍 사진 확대보기", key=f"btn_zoom_{p_ids[0]}_{p_id}_{idx}"):
-                        show_fit_image_dialog(b64_str)
             else:
                 cols = st.columns(2)
                 for img_idx, img_id in enumerate(p_ids):
@@ -290,8 +276,6 @@ else:
                         with cols[img_idx % 2]:
                             img_bytes = base64.b64decode(b64_str)
                             st.image(img_bytes, use_container_width=True)
-                            if st.button(f"🔍 사진 {img_idx+1} 확대", key=f"btn_zoom_{img_id}_{p_id}_{idx}_{img_idx}"):
-                                show_fit_image_dialog(b64_str)
 
         st.write(post["caption"])
         
