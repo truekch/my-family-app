@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 모바일 최적화 & 맨 위로 가기(▲) 플로팅 버튼 CSS ---
+# --- 🎨 모바일 최적화 & 좌측 하단 맨 위로 가기(▲) 앵커 플로팅 버튼 CSS ---
 st.markdown("""
 <style>
 /* 1. 모바일에서 컬럼 가로 유지 */
@@ -80,11 +80,11 @@ div[data-testid="stButton"] button p {
     border-radius: 6px;
 }
 
-/* 4. 맨 위로 가기(▲) 플로팅 버튼 스타일 */
+/* 4. 자바스크립트 필요 없는 순수 HTML 앵커(▲) 플로팅 버튼 (좌측 하단) */
 .scroll-to-top-btn {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    bottom: 25px;
+    left: 20px;
     width: 46px;
     height: 46px;
     background-color: #ff4b4b;
@@ -95,9 +95,9 @@ div[data-testid="stButton"] button p {
     justify-content: center;
     font-size: 20px;
     font-weight: bold;
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.35);
     z-index: 999999;
-    cursor: pointer;
+    text-decoration: none !important;
     user-select: none;
     transition: transform 0.15s ease-in-out, background-color 0.15s;
 }
@@ -108,12 +108,8 @@ div[data-testid="stButton"] button p {
 }
 </style>
 
-<!-- 맨 위로 이동 플로팅 버튼 HTML/JS -->
-<div class="scroll-to-top-btn" title="맨 위로 가기" onclick="
-    const mainContainer = window.parent.document.querySelector('.main') || window.parent.document.querySelector('section.main') || window;
-    mainContainer.scrollTo({top: 0, behavior: 'smooth'});
-    window.scrollTo({top: 0, behavior: 'smooth'});
-">▲</div>
+<!-- 좌측 하단 플로팅 버튼 -->
+<a href="#top_anchor" class="scroll-to-top-btn" target="_self" title="맨 위로 가기">▲</a>
 """, unsafe_allow_html=True)
 
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
@@ -237,6 +233,9 @@ def save_posts(posts, file_id=None):
     st.cache_data.clear()
 
 # --- 4. 메인 화면 상단 영역 ---
+# 최상단 이동 타겟 앵커
+st.markdown('<div id="top_anchor"></div>', unsafe_allow_html=True)
+
 posts, posts_file_id = load_posts()
 
 if "show_upload_form" not in st.session_state:
