@@ -164,27 +164,23 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
-# --- 4. 메인 헤더 및 상태 초기화 ---
-col_head1, col_head2 = st.columns([3, 1])
-with col_head1:
-    st.title("❤️ 우리 가족 파이썬 기록장")
-with col_head2:
-    if st.button("🔒 잠그기", key="btn_logout"):
-        st.session_state["authenticated"] = False
-        st.rerun()
-
+# --- 4. 메인 화면 상단 영역 ---
 posts, posts_file_id = load_posts()
 
 if "show_upload_form" not in st.session_state:
     st.session_state["show_upload_form"] = False
 
-# 📸 새 기록 남기기 토글 버튼
-col_btn_new, _ = st.columns([1, 1])
-with col_btn_new:
+# 📸 새 기록 남기기 & 🔒 잠그기 버튼 상단 나란히 배치
+col_top_left, col_top_right = st.columns([3, 1])
+with col_top_left:
     if st.button("📸 새 기록 남기기", key="toggle_upload_btn", use_container_width=True):
         st.session_state["show_upload_form"] = not st.session_state["show_upload_form"]
+with col_top_right:
+    if st.button("🔒 잠그기", key="btn_logout", use_container_width=True):
+        st.session_state["authenticated"] = False
+        st.rerun()
 
-# 📸 새 기록 남기기 작성 폼
+# 📸 새 기록 남기기 작성 폼 (토글)
 if st.session_state["show_upload_form"]:
     with st.form("upload_form", clear_on_submit=True):
         st.subheader("✏️ 새로운 추억 남기기")
@@ -227,8 +223,8 @@ if st.session_state["show_upload_form"]:
 
 st.divider()
 
-# 📖 가족 타임라인 피드 & 🔍 검색 필터 영역
-st.subheader("📖 가족 타임라인")
+# 📖 우리 가족 타임라인 피드 & 🔍 검색 필터 영역
+st.subheader("📖 우리 가족 타임라인")
 
 search_col1, search_col2 = st.columns([1, 2])
 with search_col1:
@@ -261,7 +257,7 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
             
-        # 📸 사진 출력 (확대 버튼 없이 이미지 자체만 깔끔하게 출력)
+        # 📸 사진 출력
         if p_ids:
             if len(p_ids) == 1:
                 b64_str = download_image_b64(p_ids[0])
