@@ -233,28 +233,6 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
-# --- 🗑️ 삭제 확인 모달 다이얼로그 ---
-@st.dialog("⚠️ 기록 삭제 확인")
-def confirm_delete_dialog(post_id, photo_ids):
-    st.write("정말로 이 기록을 삭제하시겠습니까?")
-    st.caption("삭제된 글과 사진은 복구할 수 없습니다.")
-    col_yes, col_no = st.columns(2)
-    with col_yes:
-        if st.button("네, 삭제합니다", type="primary", use_container_width=True, key=f"real_del_{post_id}"):
-            with st.spinner("드라이브에서 삭제 중..."):
-                for img_id in photo_ids:
-                    delete_file_from_drive(img_id)
-                global posts
-                posts = [p for p in posts if p.get("id") != post_id]
-                save_posts(posts, posts_file_id)
-                st.session_state[f"confirm_del_{post_id}"] = False
-                st.success("삭제되었습니다!")
-                st.rerun()
-    with col_no:
-        if st.button("취소", use_container_width=True, key=f"cancel_del_{post_id}"):
-            st.session_state[f"confirm_del_{post_id}"] = False
-            st.rerun()
-
 # --- 4. 메인 화면 상단 영역 ---
 posts, posts_file_id = load_posts()
 
@@ -347,23 +325,58 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
 
-        # 👤 작성자 정보와 우측 상단 ⋮ 드롭다운 메뉴
+        # 👤 작성자 정보 및 우측 상단 ⋮ 버튼 (토글 제어)
         col_info, col_menu = st.columns([5, 1])
         with col_info:
             st.markdown(f"**{post['author']}** · `{post['date']}`")
         
         with col_menu:
-            with st.popover("⋮"):
-                if st.button("✏️ 수정하기", key=f"pop_btn_edit_{p_id}_{idx}", use_container_width=True):
-                    st.session_state[f"editing_{p_id}"] = not st.session_state.get(f"editing_{p_id}", False)
-                    st.rerun()
-                if st.button("🗑️ 삭제하기", key=f"pop_btn_del_{p_id}_{idx}", use_container_width=True):
-                    st.session_state[f"confirm_del_{p_id}"] = True
-                    st.rerun()
+            if st.button("⋮", key=f"btn_menu_toggle_{p_id}_{idx}"):
+                st.session_state[f"show_action_panel_{p_id}"] = not st.session_state.get(f"show_action_panel_{p_id}", False)
+                # 수정/삭제 모드가 켜져 있었다면 초기화
+                st.session_state[f"mode_{p_id}"] = None
+                st.rerun()
 
-        # 🗑️ 삭제 확인 모달 호출
-        if st.session_state.get(f"confirm_del_{p_id}", False):
-            confirm_delete_dialog(post.get("id"), p_ids)
+        # ⋮ 버튼 클릭 시 열리는 직관적인 옵션 메뉴 (팝업 잔상 원천 차단)
+        if st.session_state.get(f"show_action_panel_{p_id}", False):
+            with st.container():
+                st.info("원하시는 작업을 선택해 주세요.")
+                c1, c2, c3 = st.columns([1, 1, 1])
+                with c1:
+                    if st.button("✏️ 수정하기", key=f"act_edit_{p_id}", use_container_width=True):
+                        st.session_state[f"mode_{p_id}"] = "edit"
+                        st.session_state[f"show_action_panel_{p_id}"] = False
+                        st.rerun()
+                with c2:
+                    if st.button("🗑️ 삭제하기", key=f"act_del_{p_id}", use_container_width=True):
+                        st.session_state[f"mode_{p_id}"] = "delete"
+                        st.session_state[f"show_action_panel_{p_id}"] = False
+                        st.rerun()
+                with c3:
+                    if st.button("❌ 닫기", key=f"act_close_{p_id}", use_container_width=True):
+                        st.session_state[f"show_action_panel_{p_id}"] = False
+                        st.session_state[f"mode_{p_id}"] = None
+                        st.rerun()
+
+        # 🗑️ 삭제 확인 작업 창
+        if st.session_state.get(f"mode_{p_id}") == "delete":
+            with st.status("⚠️ 삭제 확인", expanded=True):
+                st.write("정말로 이 기록을 삭제하시겠습니까? (복구할 수 없습니다)")
+                col_del_yes, col_del_no = st.columns(2)
+                with col_del_yes:
+                    if st.button("네, 삭제합니다", type="primary", key=f"confirm_del_btn_{p_id}", use_container_width=True):
+                        with st.spinner("드라이브에서 완전 삭제 중..."):
+                            for img_id in p_ids:
+                                delete_file_from_drive(img_id)
+                            posts = [p for p in posts if p.get("id") != post.get("id")]
+                            save_posts(posts, posts_file_id)
+                            st.session_state[f"mode_{p_id}"] = None
+                            st.success("삭제되었습니다!")
+                            st.rerun()
+                with col_del_no:
+                    if st.button("취소", key=f"cancel_del_btn_{p_id}", use_container_width=True):
+                        st.session_state[f"mode_{p_id}"] = None
+                        st.rerun()
 
         # 📸 순수 HTML <details> 기반 터치 확대/축소 이미지 출력
         if p_ids:
@@ -399,8 +412,8 @@ else:
 
         st.write(post["caption"])
 
-        # ✏️ 게시글 inline 수정 영역 ([작성자] -> [사진 수정] -> [글 내용])
-        if st.session_state.get(f"editing_{p_id}", False):
+        # ✏️ 게시글 수정 양식 ([작성자] -> [사진 수정] -> [글 내용])
+        if st.session_state.get(f"mode_{p_id}") == "edit":
             with st.container():
                 st.markdown("---")
                 st.markdown("**:pencil2: 게시글 수정**")
@@ -445,11 +458,9 @@ else:
                         if new_caption.strip() != "":
                             with st.spinner("구글 드라이브에 저장 중..."):
                                 try:
-                                    # 사진 원본 파일 구글 드라이브에서 삭제
                                     for d_id in delete_photo_ids:
                                         delete_file_from_drive(d_id)
 
-                                    # 새 사진 업로드
                                     final_photo_ids = list(keep_photo_ids)
                                     if new_photos:
                                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -459,7 +470,6 @@ else:
                                             uploaded_id = upload_file_to_drive(photo.getvalue(), photo_name, mime_type)
                                             final_photo_ids.append(uploaded_id)
 
-                                    # 게시글 데이터 업데이트
                                     for original_post in posts:
                                         if original_post.get("id") == post.get("id"):
                                             original_post["author"] = new_author
@@ -470,7 +480,7 @@ else:
                                             break
 
                                     save_posts(posts, posts_file_id)
-                                    st.session_state[f"editing_{p_id}"] = False
+                                    st.session_state[f"mode_{p_id}"] = None
                                     st.success("수정 완료!")
                                     st.rerun()
                                 except Exception as e:
@@ -479,7 +489,7 @@ else:
                             st.warning("글 내용을 입력해 주세요.")
                 with col_cancel:
                     if st.button("취소", key=f"cancel_edit_{p_id}", use_container_width=True):
-                        st.session_state[f"editing_{p_id}"] = False
+                        st.session_state[f"mode_{p_id}"] = None
                         st.rerun()
 
         # 💬 댓글 영역
