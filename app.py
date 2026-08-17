@@ -30,8 +30,8 @@ st.markdown("""
 
 /* 2. 버튼 내부 글자 줄바꿈 금지 및 여백 최적화 */
 div[data-testid="stButton"] button {
-    padding: 4px 12px !important;
-    min-height: 38px !important;
+    padding: 4px 8px !important;
+    min-height: 36px !important;
     white-space: nowrap !important;
     word-break: keep-all !important;
 }
@@ -112,13 +112,20 @@ div[data-testid="stButton"] button p {
 }
 </style>
 
-<!-- 좌측 하단 회색 플로팅 버튼 (최상단 이동 지원) -->
+<!-- 좌측 하단 회색 플로팅 버튼 (최상단 0px 이동) -->
 <a href="#top_anchor" class="scroll-to-top-btn" target="_self" title="맨 위로 가기" onclick="
     try {
         const win = window.parent || window;
-        const appContainer = win.document.querySelector('[data-testid=\'stAppViewContainer\']') || win.document.querySelector('.main');
-        if (appContainer) appContainer.scrollTo({top: 0, behavior: 'smooth'});
-        win.scrollTo({top: 0, behavior: 'smooth'});
+        const doc = win.document;
+        const containers = [
+            doc.querySelector('[data-testid=\'stMain\']'),
+            doc.querySelector('[data-testid=\'stAppViewContainer\']'),
+            doc.querySelector('.main'),
+            doc.documentElement,
+            doc.body
+        ];
+        containers.forEach(c => { if(c) c.scrollTop = 0; });
+        win.scrollTo(0, 0);
     } catch(e) {}
 ">▲</a>
 """, unsafe_allow_html=True)
@@ -332,12 +339,25 @@ if not filtered_posts:
 else:
     for idx, post in enumerate(filtered_posts):
         p_id = post.get("id", str(idx))
-        st.markdown(f"**{post['author']}** · `{post['date']}`")
-        
         p_ids = post.get("photo_ids", [])
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
-            
+
+        # 📌 게시글 헤더 (좌측: 작성자·날짜 / 우측 상단: ✏️ 🗑️ 이모티콘 버튼)
+        col_info, col_edit, col_del = st.columns([6, 1, 1])
+        with col_info:
+            st.markdown(f"**{post['author']}** · `{post['date']}`")
+        with col_edit:
+            show_edit = st.button("✏️", key=f"btn_show_edit_{p_id}_{idx}", help="수정")
+        with col_del:
+            if st.button("🗑️", key=f"del_{p_id}_{idx}", help="삭제"):
+                for img_id in p_ids:
+                    delete_file_from_drive(img_id)
+                posts = [p for p in posts if p.get("id") != post.get("id")]
+                save_posts(posts, posts_file_id)
+                st.success("삭제되었습니다!")
+                st.rerun()
+
         # 📸 순수 CSS 기반 터치 확대/축소 이미지 출력
         if p_ids:
             if len(p_ids) == 1:
@@ -373,19 +393,6 @@ else:
                             ''', unsafe_allow_html=True)
 
         st.write(post["caption"])
-        
-        # ✏️ 수정 / 🗑️ 삭제 버튼 영역 ([1, 1, 2] 비율)
-        col_btn1, col_btn2, _ = st.columns([1, 1, 2])
-        with col_btn1:
-            show_edit = st.button("✏️ 수정", key=f"btn_show_edit_{p_id}_{idx}")
-        with col_btn2:
-            if st.button("🗑️ 삭제", key=f"del_{p_id}_{idx}"):
-                for img_id in p_ids:
-                    delete_file_from_drive(img_id)
-                posts = [p for p in posts if p.get("id") != post.get("id")]
-                save_posts(posts, posts_file_id)
-                st.success("삭제되었습니다!")
-                st.rerun()
 
         # ✏️ 수정 화면 toggling
         if f"editing_{p_id}" not in st.session_state:
