@@ -40,6 +40,15 @@ div[data-testid="stButton"] button p {
     word-break: keep-all !important;
     font-size: 14px !important;
 }
+
+/* 3. 사진에 마우스 커서 호버 효과 (클릭할 수 있음을 표시) */
+.clickable-img {
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out;
+}
+.clickable-img:hover {
+    transform: scale(1.01);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -156,6 +165,19 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
+# --- 🔍 사진 확대 보기 모달(Dialog) 지원 함수 ---
+@st.dialog("🔍 사진 확대 감상 & 저장")
+def view_image_modal(b64_str, photo_id):
+    img_bytes = base64.b64decode(b64_str)
+    st.image(img_bytes, use_container_width=True)
+    st.download_button(
+        label="💾 사진 다운로드 (기기에 저장)",
+        data=img_bytes,
+        file_name=f"family_photo_{photo_id}.jpg",
+        mime="image/jpeg",
+        use_container_width=True
+    )
+
 # --- 4. 메인 헤더 및 상태 초기화 ---
 col_head1, col_head2 = st.columns([3, 1])
 with col_head1:
@@ -257,14 +279,18 @@ else:
             if len(p_ids) == 1:
                 b64_str = download_image_b64(p_ids[0])
                 if b64_str:
-                    st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
+                    st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="clickable-img" style="width:100%; border-radius:8px; margin-bottom:5px;">', unsafe_allow_html=True)
+                    if st.button("🔍 사진 확대 / 💾 다운로드", key=f"zoom_{p_ids[0]}_{p_id}_{idx}"):
+                        view_image_modal(b64_str, p_ids[0])
             else:
                 cols = st.columns(2)
                 for img_idx, img_id in enumerate(p_ids):
                     b64_str = download_image_b64(img_id)
                     if b64_str:
                         with cols[img_idx % 2]:
-                            st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">', unsafe_allow_html=True)
+                            st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="clickable-img" style="width:100%; border-radius:8px; margin-bottom:5px;">', unsafe_allow_html=True)
+                            if st.button(f"🔍 사진 {img_idx+1} 확대/저장", key=f"zoom_{img_id}_{p_id}_{idx}_{img_idx}"):
+                                view_image_modal(b64_str, img_id)
 
         st.write(post["caption"])
         
