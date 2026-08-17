@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 모바일 최적화 & 깔끔한 버튼 레이아웃 CSS ---
+# --- 🎨 모바일 최적화 & 이미지 터치 전체화면/우측상단 아이콘 숨김 CSS ---
 st.markdown("""
 <style>
 /* 1. 모바일에서 컬럼 가로 유지 */
@@ -40,6 +40,37 @@ div[data-testid="stButton"] button p {
     white-space: nowrap !important;
     word-break: keep-all !important;
     font-size: 14px !important;
+}
+
+/* 3. st.image 우측 상단 기본 확대/도구 아이콘 숨기기 */
+button[title="View fullscreen"] {
+    display: none !important;
+}
+div[data-testid="stImage"] button {
+    display: none !important;
+}
+
+/* 4. 클릭 가능한 사진 스타일 & 전체화면 모드 스타일 */
+.touch-expandable-img {
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out;
+}
+.touch-expandable-img:hover {
+    opacity: 0.95;
+}
+
+/* 전체화면 진입 시 화면에 맞게(Fit) 정중앙 배치 */
+.touch-expandable-img:-webkit-full-screen {
+    width: 100vw !important;
+    height: 100vh !important;
+    object-fit: contain !important;
+    background-color: rgba(0, 0, 0, 0.95) !important;
+}
+.touch-expandable-img:fullscreen {
+    width: 100vw !important;
+    height: 100vh !important;
+    object-fit: contain !important;
+    background-color: rgba(0, 0, 0, 0.95) !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -243,6 +274,17 @@ for post in posts:
 if filter_author != "전체" or search_keyword.strip():
     st.caption(f"🔎 검색 결과: 총 **{len(filtered_posts)}개**의 기록을 찾았습니다.")
 
+# 사진 터치/클릭 시 전체화면 열기 및 다시 터치 시 닫기(Toggle) JavaScript
+ONCLICK_TOGGLE_FULLSCREEN = """
+if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    if (this.requestFullscreen) { this.requestFullscreen(); }
+    else if (this.webkitRequestFullscreen) { this.webkitRequestFullscreen(); }
+} else {
+    if (document.exitFullscreen) { document.exitFullscreen(); }
+    else if (document.webkitExitFullscreen) { document.webkitExitFullscreen(); }
+}
+"""
+
 if not filtered_posts:
     if not posts:
         st.info("아직 등록된 기록이 없습니다. 상단의 [📸 새 기록 남기기] 버튼을 눌러 첫 추억을 작성해 보세요!")
@@ -257,21 +299,19 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
             
-        # 📸 사진 출력
+        # 📸 사진 출력 (사진을 터치/클릭하면 확대되고, 한번 더 터치하면 원래대로 되돌아옴)
         if p_ids:
             if len(p_ids) == 1:
                 b64_str = download_image_b64(p_ids[0])
                 if b64_str:
-                    img_bytes = base64.b64decode(b64_str)
-                    st.image(img_bytes, use_container_width=True)
+                    st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="touch-expandable-img" style="width:100%; border-radius:8px; margin-bottom:10px;" onclick="{ONCLICK_TOGGLE_FULLSCREEN}">', unsafe_allow_html=True)
             else:
                 cols = st.columns(2)
                 for img_idx, img_id in enumerate(p_ids):
                     b64_str = download_image_b64(img_id)
                     if b64_str:
                         with cols[img_idx % 2]:
-                            img_bytes = base64.b64decode(b64_str)
-                            st.image(img_bytes, use_container_width=True)
+                            st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="touch-expandable-img" style="width:100%; border-radius:8px; margin-bottom:10px;" onclick="{ONCLICK_TOGGLE_FULLSCREEN}">', unsafe_allow_html=True)
 
         st.write(post["caption"])
         
