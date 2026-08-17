@@ -379,12 +379,22 @@ else:
         col_info, col_menu = st.columns([5, 1])
         with col_info:
             st.markdown(f"**{post['author']}** · `{post['date']}`")
+        
+        btn_edit_clicked = False
+        btn_del_clicked = False
+        
         with col_menu:
             with st.popover("⋮"):
                 if st.button("✏️ 수정하기", key=f"btn_show_edit_{p_id}_{idx}", use_container_width=True):
-                    edit_post_dialog(post, posts, posts_file_id)
+                    btn_edit_clicked = True
                 if st.button("🗑️ 삭제하기", key=f"del_{p_id}_{idx}", use_container_width=True):
-                    confirm_delete_dialog(post, posts, posts_file_id)
+                    btn_del_clicked = True
+
+        # popover 영역 밖에서 모달 다이얼로그 호출 (⋮ 메뉴 자동 닫힘)
+        if btn_edit_clicked:
+            edit_post_dialog(post, posts, posts_file_id)
+        if btn_del_clicked:
+            confirm_delete_dialog(post, posts, posts_file_id)
 
         # 📸 순수 HTML <details> 기반 터치 확대/축소 이미지 출력
         if p_ids:
