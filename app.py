@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 버튼 텍스트 줄바꿈 방지 & 모바일 최적화 CSS ---
+# --- 🎨 버튼 텍스트 줄바꿈 방지 & 사진 전체화면 CSS ---
 st.markdown("""
 <style>
 /* 1. 모바일에서 컬럼이 세로로 꺾이지 않고 가로 유지 */
@@ -42,13 +42,23 @@ div[data-testid="stButton"] button p {
     font-size: 14px !important;
 }
 
-/* 3. 사진 클릭 가능한 커서 안내 */
-.img-expandable summary {
-    list-style: none;
+/* 3. 사진 커서 및 전체화면 모드 스타일 */
+.expandable-img {
     cursor: pointer;
+    transition: transform 0.2s ease-in-out;
 }
-.img-expandable summary::-webkit-details-marker {
-    display: none;
+.expandable-img:hover {
+    opacity: 0.95;
+}
+
+/* 전체화면 진입 시 검은색 배경 적용 */
+.expandable-img:-webkit-full-screen {
+    object-fit: contain !important;
+    background-color: black !important;
+}
+.expandable-img:fullscreen {
+    object-fit: contain !important;
+    background-color: black !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -256,6 +266,9 @@ for post in posts:
 if filter_author != "전체" or search_keyword.strip():
     st.caption(f"🔎 검색 결과: 총 **{len(filtered_posts)}개**의 기록을 찾았습니다.")
 
+# 사진 클릭 시 전체화면 실행 JavaScript
+ONCLICK_FULLSCREEN = "if(this.requestFullscreen){this.requestFullscreen();}else if(this.webkitRequestFullscreen){this.webkitRequestFullscreen();}"
+
 if not filtered_posts:
     if not posts:
         st.info("아직 등록된 기록이 없습니다. 상단의 [📸 새 기록 남기기] 버튼을 눌러 첫 추억을 작성해 보세요!")
@@ -270,35 +283,19 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
             
-        # 📸 클릭하면 바로 원본으로 펼쳐지는 사진 출력
+        # 📸 사진 출력 (클릭 시 전체화면)
         if p_ids:
             if len(p_ids) == 1:
                 b64_str = download_image_b64(p_ids[0])
                 if b64_str:
-                    st.markdown(f'''
-                    <details class="img-expandable">
-                        <summary><img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;" title="클릭하여 확대 감상"></summary>
-                        <div style="text-align:center; padding:10px 0;">
-                            <img src="data:image/jpeg;base64,{b64_str}" style="max-width:100%; border-radius:8px;">
-                            <p style="font-size:12px; color:gray; margin-top:5px;">💡 스마트폰은 사진을 길게 누르고, PC는 우클릭하여 '이미지 저장'을 눌러 다운로드하세요.</p>
-                        </div>
-                    </details>
-                    ''', unsafe_allow_html=True)
+                    st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="expandable-img" style="width:100%; border-radius:8px; margin-bottom:10px;" onclick="{ONCLICK_FULLSCREEN}">', unsafe_allow_html=True)
             else:
                 cols = st.columns(2)
                 for img_idx, img_id in enumerate(p_ids):
                     b64_str = download_image_b64(img_id)
                     if b64_str:
                         with cols[img_idx % 2]:
-                            st.markdown(f'''
-                            <details class="img-expandable">
-                                <summary><img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;" title="클릭하여 확대 감상"></summary>
-                                <div style="text-align:center; padding:10px 0;">
-                                    <img src="data:image/jpeg;base64,{b64_str}" style="max-width:100%; border-radius:8px;">
-                                    <p style="font-size:12px; color:gray; margin-top:5px;">💡 스마트폰은 사진을 길게 누르고, PC는 우클릭하여 '이미지 저장'을 눌러 다운로드하세요.</p>
-                                </div>
-                            </details>
-                            ''', unsafe_allow_html=True)
+                            st.markdown(f'<img src="data:image/jpeg;base64,{b64_str}" class="expandable-img" style="width:100%; border-radius:8px; margin-bottom:10px;" onclick="{ONCLICK_FULLSCREEN}">', unsafe_allow_html=True)
 
         st.write(post["caption"])
         
