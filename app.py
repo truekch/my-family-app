@@ -227,7 +227,6 @@ def save_posts(posts_data, file_id=None):
     fh = io.BytesIO(json_bytes)
     media = MediaIoBaseUpload(fh, mimetype='application/json', resumable=False)
     
-    # file_id가 파라미터로 전달되지 않았을 경우, 중복 파일 생성 방지를 위해 재검색
     if not file_id:
         try:
             query = f"'{FOLDER_ID}' in parents and name = 'posts.json' and trashed = false"
@@ -304,7 +303,7 @@ if st.session_state["show_upload_form"]:
 
 st.divider()
 
-# 📖 우리 가족 타임라인 스크롤 위치 (여유 있는 상단 위치)
+# 📖 우리 가족 타임라인 스크롤 위치
 st.markdown('<div id="timeline_anchor" style="position:relative; top:-100px; height:0px;"></div>', unsafe_allow_html=True)
 st.subheader("📖 우리 가족 타임라인")
 
@@ -337,21 +336,28 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
 
-        # 👤 작성자 정보 및 우측 상단 ⋮ (Popover 복원)
+        # 팝업 닫힘을 유도하는 동적 Key 관리
+        if f"pop_key_{p_id}" not in st.session_state:
+            st.session_state[f"pop_key_{p_id}"] = 0
+        pop_key = st.session_state[f"pop_key_{p_id}"]
+
+        # 👤 작성자 정보 및 우측 상단 ⋮ (Popover 디자인)
         col_info, col_menu = st.columns([5, 1])
         with col_info:
             st.markdown(f"**{post['author']}** · `{post['date']}`")
         
         with col_menu:
-            with st.popover("⋮"):
-                if st.button("✏️ 수정하기", key=f"pop_edit_{p_id}_{idx}", use_container_width=True):
+            with st.popover("⋮", key=f"popover_{p_id}_{pop_key}"):
+                if st.button("✏️ 수정하기", key=f"pop_btn_edit_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "edit" if st.session_state.get(f"mode_{p_id}") != "edit" else None
+                    st.session_state[f"pop_key_{p_id}"] += 1  # Key 변경으로 팝업 즉시 닫기
                     st.rerun()
-                if st.button("🗑️ 삭제하기", key=f"pop_del_{p_id}_{idx}", use_container_width=True):
+                if st.button("🗑️ 삭제하기", key=f"pop_btn_del_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "delete" if st.session_state.get(f"mode_{p_id}") != "delete" else None
+                    st.session_state[f"pop_key_{p_id}"] += 1  # Key 변경으로 팝업 즉시 닫기
                     st.rerun()
 
-        # 🗑️ 삭제 확인 인라인 창 (팝업 잔상 없이 깔끔하게 표시)
+        # 🗑️ 삭제 확인 상자
         if st.session_state.get(f"mode_{p_id}") == "delete":
             with st.status("⚠️ 기록 삭제 확인", expanded=True):
                 st.write("정말로 이 기록을 삭제하시겠습니까? (삭제된 글과 사진은 복구할 수 없습니다)")
@@ -364,11 +370,13 @@ else:
                             updated_posts = [p for p in posts if p.get("id") != post.get("id")]
                             save_posts(updated_posts, posts_file_id)
                             st.session_state[f"mode_{p_id}"] = None
+                            st.session_state[f"pop_key_{p_id}"] += 1
                             st.success("삭제되었습니다!")
                             st.rerun()
                 with col_del_no:
                     if st.button("취소", key=f"cancel_del_btn_{p_id}", use_container_width=True):
                         st.session_state[f"mode_{p_id}"] = None
+                        st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
 
         # 📸 순수 HTML <details> 기반 터치 확대/축소 이미지 출력
@@ -405,7 +413,7 @@ else:
 
         st.write(post["caption"])
 
-        # ✏️ 게시글 수정 양식 ([작성자] ➔ [사진 수정/추가] ➔ [글 내용])
+        # ✏️ 게시글 수정 양식 ([작성자] ➔ [사진 관리/추가] ➔ [글 내용])
         if st.session_state.get(f"mode_{p_id}") == "edit":
             with st.container():
                 st.markdown("---")
@@ -416,7 +424,7 @@ else:
                 curr_idx = FAMILY_MEMBERS.index(curr_author) if curr_author in FAMILY_MEMBERS else 0
                 new_author = st.selectbox("작성자", FAMILY_MEMBERS, index=curr_idx, key=f"edit_auth_{p_id}")
                 
-                # 2. 기존 사진 삭제 및 새 사진 추가 영역
+                # 2. 사진 관리 및 새 사진 추가
                 keep_photo_ids = []
                 delete_photo_ids = []
                 
@@ -474,6 +482,7 @@ else:
 
                                     save_posts(posts, posts_file_id)
                                     st.session_state[f"mode_{p_id}"] = None
+                                    st.session_state[f"pop_key_{p_id}"] += 1
                                     st.success("수정 완료!")
                                     st.rerun()
                                 except Exception as e:
@@ -483,6 +492,7 @@ else:
                 with col_cancel:
                     if st.button("취소", key=f"cancel_edit_{p_id}", use_container_width=True):
                         st.session_state[f"mode_{p_id}"] = None
+                        st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
 
         # 💬 댓글 영역
