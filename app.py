@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 모바일 최적화 & 순수 CSS :target 라이트박스 (100% 터치 열기/닫기) ---
+# --- 🎨 모바일 최적화 & 맨 위로 가기(▲) 플로팅 버튼 CSS ---
 st.markdown("""
 <style>
 /* 1. 모바일에서 컬럼 가로 유지 */
@@ -50,7 +50,7 @@ div[data-testid="stButton"] button p {
     width: 100vw;
     height: 100vh;
     background: rgba(0, 0, 0, 0.92);
-    z-index: 999999;
+    z-index: 999998;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -59,7 +59,6 @@ div[data-testid="stButton"] button p {
     transition: opacity 0.2s ease-in-out;
 }
 
-/* 사진 클릭 시 :target 활성화 */
 .lightbox-target:target {
     opacity: 1;
     pointer-events: auto;
@@ -80,7 +79,41 @@ div[data-testid="stButton"] button p {
     object-fit: contain;
     border-radius: 6px;
 }
+
+/* 4. 맨 위로 가기(▲) 플로팅 버튼 스타일 */
+.scroll-to-top-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 46px;
+    height: 46px;
+    background-color: #ff4b4b;
+    color: white !important;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 999999;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.15s ease-in-out, background-color 0.15s;
+}
+
+.scroll-to-top-btn:active {
+    transform: scale(0.9);
+    background-color: #d93838;
+}
 </style>
+
+<!-- 맨 위로 이동 플로팅 버튼 HTML/JS -->
+<div class="scroll-to-top-btn" title="맨 위로 가기" onclick="
+    const mainContainer = window.parent.document.querySelector('.main') || window.parent.document.querySelector('section.main') || window;
+    mainContainer.scrollTo({top: 0, behavior: 'smooth'});
+    window.scrollTo({top: 0, behavior: 'smooth'});
+">▲</div>
 """, unsafe_allow_html=True)
 
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
