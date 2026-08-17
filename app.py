@@ -47,7 +47,7 @@ div[data-testid="stButton"] button p {
     font-size: 13px !important;
 }
 
-/* 3. 좌측 하단 맨 위로 이동(▲) 플로팅 버튼 */
+/* 3. 좌측 하단 타임라인으로 이동(▲) 플로팅 버튼 */
 .scroll-to-top {
     position: fixed !important;
     bottom: 25px !important;
@@ -110,6 +110,9 @@ details.lightbox-details[open] .lightbox-overlay img {
 }
 </style>
 """, unsafe_allow_html=True)
+
+# 타임라인 위치로 이동하는 플로팅 버튼
+st.markdown('<a href="#timeline_anchor" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
 
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
 
@@ -251,10 +254,6 @@ def confirm_delete_dialog(post_id, photo_ids):
             st.rerun()
 
 # --- 4. 메인 화면 상단 영역 ---
-# 최상단 앵커 위치 배치 (최상단 버튼 영역 위)
-st.markdown('<div id="top_anchor" style="position:relative; top:-20px;"></div>', unsafe_allow_html=True)
-st.markdown('<a href="#top_anchor" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
-
 posts, posts_file_id = load_posts()
 
 if "show_upload_form" not in st.session_state:
@@ -313,7 +312,8 @@ if st.session_state["show_upload_form"]:
 
 st.divider()
 
-# 📖 우리 가족 타임라인 피드 & 🔍 검색 필터 영역
+# 📖 우리 가족 타임라인 앵커 및 시작 지점
+st.markdown('<div id="timeline_anchor" style="position:relative; top:-20px;"></div>', unsafe_allow_html=True)
 st.subheader("📖 우리 가족 타임라인")
 
 search_col1, search_col2 = st.columns([1, 2])
