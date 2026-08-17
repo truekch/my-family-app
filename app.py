@@ -10,37 +10,37 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 from PIL import Image, ImageOps
 
-# 1. 앱 기본 페이지 설정 (반드시 코드 최상단에 1회만 위치해야 함)
+# 1. 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
 # --- 🎨 모바일 최적화 & 디자인 CSS ---
 st.markdown("""
 <style>
-/* 모바일 가로 유지 및 버튼 디자인 최적화 */
+/* 1. 모바일 가로 유지 및 컬럼 간격 최소화 */
 @media (max-width: 640px) {
     div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 6px !important;
+        gap: 2px !important;
     }
     div[data-testid="stColumn"] {
         min-width: 0 !important;
     }
 }
 
-/* 상단 우측 ✏️, 🗑️ 이모티콘 전용 여백 감소 */
+/* 2. 상단 우측 ✏️, 🗑️ 이모티콘 간격 및 여백 최소화 */
 div[data-testid="stButton"] button {
-    padding: 2px 6px !important;
-    min-height: 32px !important;
+    padding: 2px 2px !important;
+    min-height: 28px !important;
     white-space: nowrap !important;
 }
 
 div[data-testid="stButton"] button p {
-    font-size: 15px !important;
+    font-size: 14px !important;
     margin: 0 !important;
 }
 
-/* 이미지 모달/라이트박스 스타일 */
+/* 3. 이미지 라이트박스 스타일 */
 .pure-lightbox summary {
     list-style: none !important;
     cursor: pointer;
@@ -69,7 +69,7 @@ div[data-testid="stButton"] button p {
     border-radius: 6px;
 }
 
-/* 맨 위로 가기(▲) 좌측 하단 회색 버튼 */
+/* 4. 맨 위로 가기(▲) 좌측 하단 회색 플로팅 버튼 */
 .scroll-to-top-btn {
     position: fixed;
     bottom: 15px;
@@ -224,6 +224,25 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
+# 🗑️ 삭제 확인 전용 모달 팝업 다이얼로그
+@st.dialog("🗑️ 기록 삭제 확인")
+def confirm_delete_dialog(post_id, photo_ids):
+    st.write("정말 이 기록을 삭제하시겠습니까?")
+    st.caption("삭제된 사진과 글은 구글 드라이브에서 완전히 지워지며 복구할 수 없습니다.")
+    st.markdown("<br>", unsafe_allow_html=True)
+    c_yes, c_no = st.columns(2)
+    with c_yes:
+        if st.button("네, 삭제합니다", key=f"dialog_yes_{post_id}", use_container_width=True):
+            for img_id in photo_ids:
+                delete_file_from_drive(img_id)
+            updated_posts = [p for p in posts if str(p.get("id")) != str(post_id)]
+            save_posts(updated_posts, posts_file_id)
+            st.success("삭제되었습니다!")
+            st.rerun()
+    with c_no:
+        if st.button("취소", key=f"dialog_no_{post_id}", use_container_width=True):
+            st.rerun()
+
 # --- 4. 메인 화면 최상단 버튼 영역 ---
 posts, posts_file_id = load_posts()
 
@@ -320,22 +339,17 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
 
-        # 📌 게시글 상단 헤더 (좌측: 작성자·날짜 / 우측 붙임: ✏️ 🗑️)
-        col_info, col_edit, col_del = st.columns([5, 1, 1])
+        # 📌 게시글 상단 헤더 (우측 밀착 나란히 배치 [14, 1, 1])
+        col_info, col_edit, col_del = st.columns([14, 1, 1])
         with col_info:
             st.markdown(f"**{post['author']}** · `{post['date']}`")
         with col_edit:
-            if st.button("✏️", key=f"btn_edit_{p_id}_{idx}", help="수정"):
+            if st.button("✏️", key=f"btn_edit_{p_id}_{idx}", help="수정", use_container_width=True):
                 st.session_state[f"editing_{p_id}"] = not st.session_state[f"editing_{p_id}"]
                 st.rerun()
         with col_del:
-            if st.button("🗑️", key=f"btn_del_{p_id}_{idx}", help="삭제"):
-                for img_id in p_ids:
-                    delete_file_from_drive(img_id)
-                posts = [p for p in posts if str(p.get("id")) != p_id]
-                save_posts(posts, posts_file_id)
-                st.success("삭제되었습니다!")
-                st.rerun()
+            if st.button("🗑️", key=f"btn_del_{p_id}_{idx}", help="삭제", use_container_width=True):
+                confirm_delete_dialog(p_id, p_ids)
 
         # 📸 순수 CSS 기반 터치 확대/축소 이미지
         if p_ids:
