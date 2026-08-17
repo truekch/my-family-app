@@ -13,9 +13,14 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 모바일 최적화, 맨 위로 이동 버튼 & 순수 HTML <details> 라이트박스 CSS ---
+# --- 🎨 모바일 최적화, 스무스 스크롤, 맨 위로 이동 버튼 CSS ---
 st.markdown("""
 <style>
+/* 부드러운 스크롤 이동 */
+html {
+    scroll-behavior: smooth;
+}
+
 /* 1. 모바일에서 컬럼 가로 배치 유지 및 간격 조절 */
 @media (max-width: 640px) {
     div[data-testid="stHorizontalBlock"] {
@@ -52,8 +57,9 @@ div[data-testid="stButton"] button p {
     background-color: #4A5568 !important;
     color: white !important;
     border-radius: 50% !important;
-    text-align: center !important;
-    line-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
     font-size: 20px !important;
     font-weight: bold !important;
     text-decoration: none !important;
@@ -104,10 +110,6 @@ details.lightbox-details[open] .lightbox-overlay img {
 }
 </style>
 """, unsafe_allow_html=True)
-
-# 페이지 최상단 앵커 & 좌측 하단 맨 위로 이동 플로팅 버튼
-st.markdown('<div id="top"></div>', unsafe_allow_html=True)
-st.markdown('<a href="#top" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
 
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
 
@@ -170,7 +172,6 @@ def download_image_b64(file_id):
             _, done = downloader.next_chunk()
         img_bytes = fh.getvalue()
         
-        # 📸 EXIF orientation 회전 자동 보정 처리
         img = Image.open(io.BytesIO(img_bytes))
         img = ImageOps.exif_transpose(img)
         
@@ -229,7 +230,7 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
-# --- 🗑️ 삭제 확인 모달 다이얼로그 ---
+# --- 🗑️ 삭제 확인 모달 다이얼로그 (버튼 누르면 즉시 닫힘) ---
 @st.dialog("⚠️ 기록 삭제 확인")
 def confirm_delete_dialog(post_id, photo_ids):
     st.write("정말로 이 기록을 삭제하시겠습니까?")
@@ -239,9 +240,8 @@ def confirm_delete_dialog(post_id, photo_ids):
         if st.button("네, 삭제합니다", type="primary", key=f"real_del_{post_id}", use_container_width=True):
             for img_id in photo_ids:
                 delete_file_from_drive(img_id)
-            global posts
-            posts = [p for p in posts if p.get("id") != post_id]
-            save_posts(posts, posts_file_id)
+            updated_posts = [p for p in posts if p.get("id") != post_id]
+            save_posts(updated_posts, posts_file_id)
             st.session_state[f"confirm_del_{post_id}"] = False
             st.success("삭제되었습니다!")
             st.rerun()
@@ -251,6 +251,10 @@ def confirm_delete_dialog(post_id, photo_ids):
             st.rerun()
 
 # --- 4. 메인 화면 상단 영역 ---
+# 최상단 앵커 위치 배치 (최상단 버튼 영역 위)
+st.markdown('<div id="top_anchor" style="position:relative; top:-20px;"></div>', unsafe_allow_html=True)
+st.markdown('<a href="#top_anchor" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
+
 posts, posts_file_id = load_posts()
 
 if "show_upload_form" not in st.session_state:
@@ -341,15 +345,18 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
 
-        # 👤 작성자 정보와 우측 상단 ⋮ (점 3개) 드롭다운 메뉴
+        # 👤 작성자 정보와 우측 상단 ⋮ 드롭다운 메뉴
         col_info, col_menu = st.columns([5, 1])
         with col_info:
             st.markdown(f"**{post['author']}** · `{post['date']}`")
         with col_menu:
             with st.popover("⋮"):
-                show_edit = st.button("✏️ 수정하기", key=f"btn_show_edit_{p_id}_{idx}", use_container_width=True)
+                if st.button("✏️ 수정하기", key=f"btn_show_edit_{p_id}_{idx}", use_container_width=True):
+                    st.session_state[f"editing_{p_id}"] = not st.session_state.get(f"editing_{p_id}", False)
+                    st.rerun()
                 if st.button("🗑️ 삭제하기", key=f"del_{p_id}_{idx}", use_container_width=True):
                     st.session_state[f"confirm_del_{p_id}"] = True
+                    st.rerun()
 
         # 🗑️ 삭제 확인 모달 호출
         if st.session_state.get(f"confirm_del_{p_id}", False):
@@ -389,14 +396,8 @@ else:
 
         st.write(post["caption"])
 
-        # ✏️ 수정 화면 toggling
-        if f"editing_{p_id}" not in st.session_state:
-            st.session_state[f"editing_{p_id}"] = False
-
-        if show_edit:
-            st.session_state[f"editing_{p_id}"] = not st.session_state[f"editing_{p_id}"]
-
-        if st.session_state[f"editing_{p_id}"]:
+        # ✏️ 수정 화면 toggling & 닫기(취소) 지원
+        if st.session_state.get(f"editing_{p_id}", False):
             with st.container():
                 st.markdown("---")
                 st.markdown("**:pencil2: 게시글 수정**")
@@ -405,16 +406,22 @@ else:
                 new_author = st.selectbox("작성자", FAMILY_MEMBERS, index=curr_author_idx, key=f"edit_auth_{p_id}")
                 new_caption = st.text_area("글 내용", value=post["caption"], key=f"edit_cap_{p_id}")
                 
-                if st.button("수정 저장하기", key=f"save_edit_{p_id}"):
-                    for original_post in posts:
-                        if original_post.get("id") == post.get("id"):
-                            original_post["author"] = new_author
-                            original_post["caption"] = new_caption
-                            break
-                    save_posts(posts, posts_file_id)
-                    st.session_state[f"editing_{p_id}"] = False
-                    st.success("수정 완료!")
-                    st.rerun()
+                col_save, col_cancel = st.columns(2)
+                with col_save:
+                    if st.button("수정 저장하기", key=f"save_edit_{p_id}", use_container_width=True):
+                        for original_post in posts:
+                            if original_post.get("id") == post.get("id"):
+                                original_post["author"] = new_author
+                                original_post["caption"] = new_caption
+                                break
+                        save_posts(posts, posts_file_id)
+                        st.session_state[f"editing_{p_id}"] = False
+                        st.success("수정 완료!")
+                        st.rerun()
+                with col_cancel:
+                    if st.button("취소", key=f"cancel_edit_{p_id}", use_container_width=True):
+                        st.session_state[f"editing_{p_id}"] = False
+                        st.rerun()
 
         # 💬 댓글 영역
         comments = post.get("comments", [])
