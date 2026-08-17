@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 모바일 최적화 & 좌측 하단 맨 위로 가기(▲) 앵커 플로팅 버튼 CSS ---
+# --- 🎨 모바일 최적화 & 좌측 하단 밀착 회색 플로팅 버튼 CSS ---
 st.markdown("""
 <style>
 /* 1. 모바일에서 컬럼 가로 유지 */
@@ -80,36 +80,47 @@ div[data-testid="stButton"] button p {
     border-radius: 6px;
 }
 
-/* 4. 자바스크립트 필요 없는 순수 HTML 앵커(▲) 플로팅 버튼 (좌측 하단) */
+/* 4. 맨 위로 가기(▲) 플로팅 버튼 스타일 (하단부 밀착 & 차분한 회색) */
 .scroll-to-top-btn {
     position: fixed;
-    bottom: 25px;
-    left: 20px;
-    width: 46px;
-    height: 46px;
-    background-color: #ff4b4b;
-    color: white !important;
+    bottom: 12px;
+    left: 15px;
+    width: 42px;
+    height: 42px;
+    background-color: #6c757d;
+    color: #ffffff !important;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 20px;
+    font-size: 18px;
     font-weight: bold;
-    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.35);
+    box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.25);
     z-index: 999999;
     text-decoration: none !important;
     user-select: none;
-    transition: transform 0.15s ease-in-out, background-color 0.15s;
+    transition: all 0.15s ease-in-out;
+}
+
+.scroll-to-top-btn:hover {
+    background-color: #5a6268;
 }
 
 .scroll-to-top-btn:active {
-    transform: scale(0.9);
-    background-color: #d93838;
+    transform: scale(0.92);
+    background-color: #4e555b;
 }
 </style>
 
-<!-- 좌측 하단 플로팅 버튼 -->
-<a href="#top_anchor" class="scroll-to-top-btn" target="_self" title="맨 위로 가기">▲</a>
+<!-- 좌측 하단 회색 플로팅 버튼 (최상단 이동 지원) -->
+<a href="#top_anchor" class="scroll-to-top-btn" target="_self" title="맨 위로 가기" onclick="
+    try {
+        const win = window.parent || window;
+        const appContainer = win.document.querySelector('[data-testid=\'stAppViewContainer\']') || win.document.querySelector('.main');
+        if (appContainer) appContainer.scrollTo({top: 0, behavior: 'smooth'});
+        win.scrollTo({top: 0, behavior: 'smooth'});
+    } catch(e) {}
+">▲</a>
 """, unsafe_allow_html=True)
 
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
@@ -232,8 +243,7 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
-# --- 4. 메인 화면 상단 영역 ---
-# 최상단 이동 타겟 앵커
+# --- 4. 메인 화면 최상단 영역 (앵커 위치) ---
 st.markdown('<div id="top_anchor"></div>', unsafe_allow_html=True)
 
 posts, posts_file_id = load_posts()
