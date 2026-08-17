@@ -13,7 +13,7 @@ from PIL import Image, ImageOps
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
 
-# --- 🎨 모바일 최적화 & 순수 CSS 라이트박스(사진 터치 확대/축소) 스타일 ---
+# --- 🎨 모바일 최적화 & 순수 CSS :target 라이트박스 (100% 터치 열기/닫기) ---
 st.markdown("""
 <style>
 /* 1. 모바일에서 컬럼 가로 유지 */
@@ -42,34 +42,42 @@ div[data-testid="stButton"] button p {
     font-size: 14px !important;
 }
 
-/* 3. 모바일 터치 확대/축소 라이트박스 CSS */
-.pure-lightbox summary {
-    list-style: none !important;
-    cursor: pointer;
-}
-.pure-lightbox summary::-webkit-details-marker {
-    display: none !important;
-}
-
-/* 터치 시 화면 전체를 덮는 확대 레이어 */
-.lightbox-overlay {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    background-color: rgba(0, 0, 0, 0.92) !important;
-    z-index: 999999 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    cursor: pointer;
+/* 3. 순수 CSS :target 라이트박스 스타일 */
+.lightbox-target {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease-in-out;
 }
 
-.lightbox-overlay img {
-    max-width: 95vw !important;
-    max-height: 95vh !important;
-    object-fit: contain !important;
+/* 사진 클릭 시 :target 활성화 */
+.lightbox-target:target {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.lightbox-close-link {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none !important;
+}
+
+.lightbox-close-link img {
+    max-width: 95vw;
+    max-height: 95vh;
+    object-fit: contain;
     border-radius: 6px;
 }
 </style>
@@ -288,18 +296,21 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
             
-        # 📸 사진 출력 (터치 시 화면 확대 / 다시 터치 시 축소)
+        # 📸 순수 CSS 기반 터치 확대/축소 이미지 출력
         if p_ids:
             if len(p_ids) == 1:
                 b64_str = download_image_b64(p_ids[0])
                 if b64_str:
+                    target_id = f"zoom_img_{p_ids[0]}_{idx}"
                     st.markdown(f'''
-                    <details class="pure-lightbox">
-                        <summary><img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;"></summary>
-                        <div class="lightbox-overlay" onclick="this.parentElement.removeAttribute('open')">
+                    <a href="#{target_id}">
+                        <img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">
+                    </a>
+                    <div id="{target_id}" class="lightbox-target">
+                        <a href="#_" class="lightbox-close-link">
                             <img src="data:image/jpeg;base64,{b64_str}">
-                        </div>
-                    </details>
+                        </a>
+                    </div>
                     ''', unsafe_allow_html=True)
             else:
                 cols = st.columns(2)
@@ -307,13 +318,16 @@ else:
                     b64_str = download_image_b64(img_id)
                     if b64_str:
                         with cols[img_idx % 2]:
+                            target_id = f"zoom_img_{img_id}_{idx}_{img_idx}"
                             st.markdown(f'''
-                            <details class="pure-lightbox">
-                                <summary><img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;"></summary>
-                                <div class="lightbox-overlay" onclick="this.parentElement.removeAttribute('open')">
+                            <a href="#{target_id}">
+                                <img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">
+                            </a>
+                            <div id="{target_id}" class="lightbox-target">
+                                <a href="#_" class="lightbox-close-link">
                                     <img src="data:image/jpeg;base64,{b64_str}">
-                                </div>
-                            </details>
+                                </a>
+                            </div>
                             ''', unsafe_allow_html=True)
 
         st.write(post["caption"])
