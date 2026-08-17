@@ -233,23 +233,54 @@ def save_posts(posts, file_id=None):
         drive_service.files().create(body=file_metadata, media_body=media).execute()
     st.cache_data.clear()
 
-# --- 🗑️ 삭제 확인 모달 다이얼로그 (삭제 완료 시 모달 자동 종료) ---
+# --- ✏️ 게시글 수정 모달 다이얼로그 ---
+@st.dialog("✏️ 기록 수정하기")
+def edit_post_dialog(post, posts_data, posts_file_id):
+    curr_author = post.get("author", FAMILY_MEMBERS[0])
+    curr_idx = FAMILY_MEMBERS.index(curr_author) if curr_author in FAMILY_MEMBERS else 0
+
+    new_author = st.selectbox("작성자", FAMILY_MEMBERS, index=curr_idx)
+    new_caption = st.text_area("글 내용", value=post.get("caption", ""))
+
+    col_save, col_cancel = st.columns(2)
+    with col_save:
+        if st.button("수정 저장하기", type="primary", use_container_width=True):
+            if new_caption.strip() != "":
+                for p in posts_data:
+                    if p.get("id") == post.get("id"):
+                        p["author"] = new_author
+                        p["caption"] = new_caption
+                        break
+                save_posts(posts_data, posts_file_id)
+                st.success("수정 완료!")
+                st.rerun()
+            else:
+                st.warning("글 내용을 작성해 주세요.")
+    with col_cancel:
+        if st.button("취소", use_container_width=True):
+            st.rerun()
+
+# --- 🗑️ 삭제 확인 모달 다이얼로그 ---
 @st.dialog("⚠️ 기록 삭제 확인")
-def confirm_delete_dialog(post_id, photo_ids):
+def confirm_delete_dialog(post, posts_data, posts_file_id):
     st.write("정말로 이 기록을 삭제하시겠습니까?")
     st.caption("삭제된 글과 사진은 복구할 수 없습니다.")
+    
+    photo_ids = post.get("photo_ids", [])
+    if not photo_ids and post.get("photo_id"):
+        photo_ids = [post.get("photo_id")]
+
     col_yes, col_no = st.columns(2)
     with col_yes:
-        if st.button("네, 삭제합니다", type="primary", key=f"real_del_{post_id}", use_container_width=True):
+        if st.button("네, 삭제합니다", type="primary", use_container_width=True):
             for img_id in photo_ids:
                 delete_file_from_drive(img_id)
-            updated_posts = [p for p in posts if p.get("id") != post_id]
+            updated_posts = [p for p in posts_data if p.get("id") != post.get("id")]
             save_posts(updated_posts, posts_file_id)
-            st.session_state[f"confirm_del_{post_id}"] = False
+            st.success("삭제되었습니다!")
             st.rerun()
     with col_no:
-        if st.button("취소", key=f"cancel_del_{post_id}", use_container_width=True):
-            st.session_state[f"confirm_del_{post_id}"] = False
+        if st.button("취소", use_container_width=True):
             st.rerun()
 
 # --- 4. 메인 화면 상단 영역 ---
@@ -311,7 +342,7 @@ if st.session_state["show_upload_form"]:
 
 st.divider()
 
-# 📖 우리 가족 타임라인 스크롤 위치 (넉넉한 상단 여백)
+# 📖 우리 가족 타임라인 스크롤 위치 (여유 있는 상단 위치)
 st.markdown('<div id="timeline_anchor" style="position:relative; top:-100px; height:0px;"></div>', unsafe_allow_html=True)
 st.subheader("📖 우리 가족 타임라인")
 
@@ -351,15 +382,9 @@ else:
         with col_menu:
             with st.popover("⋮"):
                 if st.button("✏️ 수정하기", key=f"btn_show_edit_{p_id}_{idx}", use_container_width=True):
-                    st.session_state[f"editing_{p_id}"] = not st.session_state.get(f"editing_{p_id}", False)
-                    st.rerun()
+                    edit_post_dialog(post, posts, posts_file_id)
                 if st.button("🗑️ 삭제하기", key=f"del_{p_id}_{idx}", use_container_width=True):
-                    st.session_state[f"confirm_del_{p_id}"] = True
-                    st.rerun()
-
-        # 🗑️ 삭제 확인 모달 호출
-        if st.session_state.get(f"confirm_del_{p_id}", False):
-            confirm_delete_dialog(post.get("id"), p_ids)
+                    confirm_delete_dialog(post, posts, posts_file_id)
 
         # 📸 순수 HTML <details> 기반 터치 확대/축소 이미지 출력
         if p_ids:
@@ -394,33 +419,6 @@ else:
                             ''', unsafe_allow_html=True)
 
         st.write(post["caption"])
-
-        # ✏️ 수정 화면 toggling & 닫기(취소) 지원
-        if st.session_state.get(f"editing_{p_id}", False):
-            with st.container():
-                st.markdown("---")
-                st.markdown("**:pencil2: 게시글 수정**")
-                
-                curr_author_idx = FAMILY_MEMBERS.index(post['author']) if post['author'] in FAMILY_MEMBERS else 0
-                new_author = st.selectbox("작성자", FAMILY_MEMBERS, index=curr_author_idx, key=f"edit_auth_{p_id}")
-                new_caption = st.text_area("글 내용", value=post["caption"], key=f"edit_cap_{p_id}")
-                
-                col_save, col_cancel = st.columns(2)
-                with col_save:
-                    if st.button("수정 저장하기", key=f"save_edit_{p_id}", use_container_width=True):
-                        for original_post in posts:
-                            if original_post.get("id") == post.get("id"):
-                                original_post["author"] = new_author
-                                original_post["caption"] = new_caption
-                                break
-                        save_posts(posts, posts_file_id)
-                        st.session_state[f"editing_{p_id}"] = False
-                        st.success("수정 완료!")
-                        st.rerun()
-                with col_cancel:
-                    if st.button("취소", key=f"cancel_edit_{p_id}", use_container_width=True):
-                        st.session_state[f"editing_{p_id}"] = False
-                        st.rerun()
 
         # 💬 댓글 영역
         comments = post.get("comments", [])
