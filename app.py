@@ -10,8 +10,15 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 import io
 from PIL import Image, ImageOps
 
+# HEIC 지원 라이브러리 예외 처리
+try:
+    from pillow_heif import register_heif_opener
+    register_heif_opener()
+except ImportError:
+    pass
+
 # 앱 기본 페이지 설정
-st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️")
+st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️", layout="centered")
 
 # --- 🎨 모바일 최적화, 스무스 스크롤, 맨 위로 이동 버튼 CSS ---
 st.markdown("""
@@ -271,7 +278,7 @@ if st.session_state["show_upload_form"]:
 
         if submitted:
             if caption.strip() != "":
-                with st.spinner("내 구글 원 2TB 드라이브로 저장 중..."):
+                with st.spinner("구글 드라이브로 저장 중..."):
                     try:
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                         photo_ids = []
@@ -350,11 +357,11 @@ else:
             with st.popover("⋮", key=f"popover_{p_id}_{pop_key}"):
                 if st.button("✏️ 수정하기", key=f"pop_btn_edit_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "edit" if st.session_state.get(f"mode_{p_id}") != "edit" else None
-                    st.session_state[f"pop_key_{p_id}"] += 1  # Key 변경으로 팝업 즉시 닫기
+                    st.session_state[f"pop_key_{p_id}"] += 1
                     st.rerun()
                 if st.button("🗑️ 삭제하기", key=f"pop_btn_del_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "delete" if st.session_state.get(f"mode_{p_id}") != "delete" else None
-                    st.session_state[f"pop_key_{p_id}"] += 1  # Key 변경으로 팝업 즉시 닫기
+                    st.session_state[f"pop_key_{p_id}"] += 1
                     st.rerun()
 
         # 🗑️ 삭제 확인 상자
@@ -413,7 +420,7 @@ else:
 
         st.write(post["caption"])
 
-        # ✏️ 게시글 수정 양식 ([작성자] ➔ [사진 관리/추가] ➔ [글 내용])
+        # ✏️ 게시글 수정 양식
         if st.session_state.get(f"mode_{p_id}") == "edit":
             with st.container():
                 st.markdown("---")
