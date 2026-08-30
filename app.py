@@ -169,10 +169,10 @@ except Exception as e:
     st.error(f"Google Drive 연결 초기화 실패: {e}")
     st.stop()
 
-# --- 3. API 재시도 처리(Retry)를 포함한 구글 드라이브 연동 함수들 ---
+# --- 3. API 재시도 처리(Retry) 및 메모리 최적화 함수들 ---
 
 def execute_with_retry(func, retries=3, delay=1):
-    """API 호출 제한(Quota Exceeded) 발생 시 자동 재시도하는 래퍼 함수"""
+    """API 호출 제한(Quota Exceeded) 발생 시 자동 재시도"""
     for i in range(retries):
         try:
             return func()
@@ -187,9 +187,10 @@ def execute_with_retry(func, retries=3, delay=1):
                 continue
             raise e
 
-@st.cache_data(ttl=3600, show_spinner=False)
+# 메모리 초과(OOM) 방지: 최대 캐시 항목 개수 20개로 제한
+@st.cache_data(ttl=1800, max_entries=20, show_spinner=False)
 def download_image_b64(file_id):
-    """드라이브에서 이미지를 받아와 EXIF 자동 회전 보정 후 Base64로 변환하여 캐싱"""
+    """드라이브에서 이미지를 받아와 경량화 후 Base64 변환"""
     if not file_id:
         return None
     
@@ -207,11 +208,16 @@ def download_image_b64(file_id):
         img = Image.open(io.BytesIO(img_bytes))
         img = ImageOps.exif_transpose(img)
         
+        # 메모리 절감을 위해 해상도 최적화 (가로/세로 최대 1080px)
+        img.thumbnail((1080, 1080), Image.Resampling.LANCZOS)
+        
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=85)
-        return base64.b64encode(buffered.getvalue()).decode('utf-8')
-    except Exception as e:
-        # 연속 접속 시 에러가 발생하더라도 앱 전체가 다운되는 대신 None 반환
+        img.save(buffered, format="JPEG", quality=80, optimize=True)
+        b64_res = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        
+        buffered.close()
+        return b64_res
+    except Exception:
         return None
 
 def download_file_bytes(file_id):
@@ -230,7 +236,9 @@ def upload_file_to_drive(file_bytes, file_name, mime_type):
         file_metadata = {'name': file_name, 'parents': [FOLDER_ID]}
         fh = io.BytesIO(file_bytes)
         media = MediaIoBaseUpload(fh, mimetype=mime_type, resumable=False)
-        return drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        res = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+        fh.close()
+        return res
     
     res = execute_with_retry(_upload)
     return res.get('id')
@@ -256,8 +264,8 @@ def load_posts():
         file_id = files[0]['id']
         content = download_file_bytes(file_id)
         return json.loads(content.decode('utf-8')), file_id
-    except Exception as e:
-        st.warning("⚠️ 접속 요청이 많아 데이터를 불러오는 중입니다. 잠시 후 [새로고침]을 해주세요.")
+    except Exception:
+        st.warning("⚠️ 데이터를 불러오는 중입니다. 잠시 후 [새로고침]을 해주세요.")
         return [], None
 
 def save_posts(posts_data, file_id=None):
@@ -279,6 +287,7 @@ def save_posts(posts_data, file_id=None):
         else:
             file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
             drive_service.files().create(body=file_metadata, media_body=media).execute()
+        fh.close()
 
     execute_with_retry(_save)
     st.cache_data.clear()
