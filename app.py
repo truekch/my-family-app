@@ -7,7 +7,9 @@ from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
+from googleapiclient.errors import HttpError
 import io
+import time
 from PIL import Image, ImageOps
 
 # HEIC 지원 라이브러리 예외 처리
@@ -164,61 +166,90 @@ try:
     drive_service = get_drive_service()
     FOLDER_ID = st.secrets["DRIVE_FOLDER_ID"]
 except Exception as e:
-    st.error(f"Google Drive 연결 실패: {e}")
+    st.error(f"Google Drive 연결 초기화 실패: {e}")
     st.stop()
 
-# --- 3. 구글 드라이브 캐싱 & EXIF 자동 회전 보정 함수 ---
+# --- 3. API 재시도 처리(Retry)를 포함한 구글 드라이브 연동 함수들 ---
+
+def execute_with_retry(func, retries=3, delay=1):
+    """API 호출 제한(Quota Exceeded) 발생 시 자동 재시도하는 래퍼 함수"""
+    for i in range(retries):
+        try:
+            return func()
+        except HttpError as err:
+            if err.resp.status in [429, 500, 502, 503, 504] and i < retries - 1:
+                time.sleep(delay * (i + 1))
+                continue
+            raise err
+        except Exception as e:
+            if i < retries - 1:
+                time.sleep(delay)
+                continue
+            raise e
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def download_image_b64(file_id):
-    """드라이브에서 이미지를 받아와 EXIF 자동 회전 보정 후 Base64로 변환하여 캐싱(1시간)"""
+    """드라이브에서 이미지를 받아와 EXIF 자동 회전 보정 후 Base64로 변환하여 캐싱"""
     if not file_id:
         return None
-    try:
+    
+    def _download():
         request = drive_service.files().get_media(fileId=file_id)
         fh = io.BytesIO()
         downloader = MediaIoBaseDownload(fh, request)
         done = False
         while not done:
             _, done = downloader.next_chunk()
-        img_bytes = fh.getvalue()
-        
+        return fh.getvalue()
+
+    try:
+        img_bytes = execute_with_retry(_download)
         img = Image.open(io.BytesIO(img_bytes))
         img = ImageOps.exif_transpose(img)
         
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG")
+        img.save(buffered, format="JPEG", quality=85)
         return base64.b64encode(buffered.getvalue()).decode('utf-8')
-    except Exception:
+    except Exception as e:
+        # 연속 접속 시 에러가 발생하더라도 앱 전체가 다운되는 대신 None 반환
         return None
 
 def download_file_bytes(file_id):
-    request = drive_service.files().get_media(fileId=file_id)
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
-    done = False
-    while not done:
-        _, done = downloader.next_chunk()
-    return fh.getvalue()
+    def _download():
+        request = drive_service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        return fh.getvalue()
+    return execute_with_retry(_download)
 
 def upload_file_to_drive(file_bytes, file_name, mime_type):
-    file_metadata = {'name': file_name, 'parents': [FOLDER_ID]}
-    fh = io.BytesIO(file_bytes)
-    media = MediaIoBaseUpload(fh, mimetype=mime_type, resumable=False)
-    uploaded_file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-    return uploaded_file.get('id')
+    def _upload():
+        file_metadata = {'name': file_name, 'parents': [FOLDER_ID]}
+        fh = io.BytesIO(file_bytes)
+        media = MediaIoBaseUpload(fh, mimetype=mime_type, resumable=False)
+        return drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    
+    res = execute_with_retry(_upload)
+    return res.get('id')
 
 def delete_file_from_drive(file_id):
     if not file_id:
         return
     try:
-        drive_service.files().delete(fileId=file_id).execute()
+        execute_with_retry(lambda: drive_service.files().delete(fileId=file_id).execute())
     except Exception:
         pass
 
 def load_posts():
     try:
-        query = f"'{FOLDER_ID}' in parents and name = 'posts.json' and trashed = false"
-        results = drive_service.files().list(q=query, fields="files(id)").execute()
+        def _list_files():
+            query = f"'{FOLDER_ID}' in parents and name = 'posts.json' and trashed = false"
+            return drive_service.files().list(q=query, fields="files(id)").execute()
+        
+        results = execute_with_retry(_list_files)
         files = results.get('files', [])
         if not files:
             return [], None
@@ -226,29 +257,30 @@ def load_posts():
         content = download_file_bytes(file_id)
         return json.loads(content.decode('utf-8')), file_id
     except Exception as e:
-        st.error(f"데이터 로딩 지연 중입니다. 잠시 후 페이지를 새로고침해 주세요. ({e})")
+        st.warning("⚠️ 접속 요청이 많아 데이터를 불러오는 중입니다. 잠시 후 [새로고침]을 해주세요.")
         return [], None
 
 def save_posts(posts_data, file_id=None):
     json_bytes = json.dumps(posts_data, ensure_ascii=False, indent=2).encode('utf-8')
-    fh = io.BytesIO(json_bytes)
-    media = MediaIoBaseUpload(fh, mimetype='application/json', resumable=False)
     
-    if not file_id:
-        try:
+    def _save():
+        fh = io.BytesIO(json_bytes)
+        media = MediaIoBaseUpload(fh, mimetype='application/json', resumable=False)
+        target_id = file_id
+        if not target_id:
             query = f"'{FOLDER_ID}' in parents and name = 'posts.json' and trashed = false"
             results = drive_service.files().list(q=query, fields="files(id)").execute()
             files = results.get('files', [])
             if files:
-                file_id = files[0]['id']
-        except Exception:
-            pass
+                target_id = files[0]['id']
 
-    if file_id:
-        drive_service.files().update(fileId=file_id, media_body=media).execute()
-    else:
-        file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
-        drive_service.files().create(body=file_metadata, media_body=media).execute()
+        if target_id:
+            drive_service.files().update(fileId=target_id, media_body=media).execute()
+        else:
+            file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
+            drive_service.files().create(body=file_metadata, media_body=media).execute()
+
+    execute_with_retry(_save)
     st.cache_data.clear()
 
 # --- 4. 메인 화면 상단 영역 ---
@@ -343,7 +375,6 @@ else:
         if not p_ids and post.get("photo_id"):
             p_ids = [post.get("photo_id")]
 
-        # 팝업 닫힘을 유도하는 동적 Key 관리
         if f"pop_key_{p_id}" not in st.session_state:
             st.session_state[f"pop_key_{p_id}"] = 0
         pop_key = st.session_state[f"pop_key_{p_id}"]
@@ -426,12 +457,10 @@ else:
                 st.markdown("---")
                 st.markdown("**:pencil2: 게시글 수정**")
                 
-                # 1. 작성자 선택
                 curr_author = post.get("author", FAMILY_MEMBERS[0])
                 curr_idx = FAMILY_MEMBERS.index(curr_author) if curr_author in FAMILY_MEMBERS else 0
                 new_author = st.selectbox("작성자", FAMILY_MEMBERS, index=curr_idx, key=f"edit_auth_{p_id}")
                 
-                # 2. 사진 관리 및 새 사진 추가
                 keep_photo_ids = []
                 delete_photo_ids = []
                 
@@ -457,7 +486,6 @@ else:
                     key=f"edit_photos_{p_id}"
                 )
 
-                # 3. 글 내용 수정
                 new_caption = st.text_area("글 내용", value=post.get("caption", ""), key=f"edit_cap_{p_id}")
                 
                 col_save, col_cancel = st.columns(2)
