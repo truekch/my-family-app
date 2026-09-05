@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import io
 import time
+import copy
 from datetime import datetime
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
@@ -61,6 +62,8 @@ div[data-testid="stButton"] button p {
     z-index: 99999 !important;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
 }
+
+/* --- 사진 확대(Lightbox) 오류 수정 영역 --- */
 details.lightbox-details summary {
     list-style: none !important;
     cursor: pointer;
@@ -68,6 +71,11 @@ details.lightbox-details summary {
 details.lightbox-details summary::-webkit-details-marker {
     display: none !important;
 }
+/* 평소에는 오버레이용 사진을 숨겨서 중복 노출을 방지합니다. */
+.lightbox-overlay {
+    display: none;
+}
+/* 사진을 터치(클릭)했을 때만 오버레이를 전체화면으로 띄웁니다. */
 details.lightbox-details[open] .lightbox-overlay {
     display: flex !important;
     position: fixed !important;
@@ -137,7 +145,7 @@ except Exception as e:
     st.stop()
 
 # --- 3. [핵심 방어] 구글 API 병목 차단용 백오프 재시도 로직 ---
-def execute_with_retry(func, retries=5): # 가족 4명 동시접속 고려 재시도 5회로 확장
+def execute_with_retry(func, retries=5): 
     delay = 1
     for i in range(retries):
         try:
@@ -285,8 +293,8 @@ if st.session_state["show_upload_form"]:
                             "comments": []
                         }
                         
-                        # 캐시 충돌 방지를 위해 리스트 복사 후 처리
-                        updated_posts = list(posts)
+                        # 안전한 깊은 복사(Deep Copy)를 통해 스팀릿 캐시 충돌 방지
+                        updated_posts = copy.deepcopy(posts)
                         updated_posts.insert(0, new_post)
                         save_posts(updated_posts, posts_file_id)
                         
@@ -387,7 +395,8 @@ else:
                 c_text = st.text_input("댓글 내용", key=f"c_text_{p_id}")
                 if st.form_submit_button("댓글 남기기"):
                     if c_text.strip():
-                        updated_posts = list(posts) # 안전한 복사
+                        # 안전한 깊은 복사(Deep Copy)를 통해 스팀릿 캐시 충돌 방지
+                        updated_posts = copy.deepcopy(posts)
                         for original_post in updated_posts:
                             if original_post.get("id") == post.get("id"):
                                 if "comments" not in original_post:
