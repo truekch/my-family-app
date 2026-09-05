@@ -104,8 +104,25 @@ details.lightbox-details[open] .lightbox-overlay img {
 </style>
 """, unsafe_allow_html=True)
 
+FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
+FAMILY_PIN = st.secrets.get("FAMILY_PIN", "123456")
+
+# --- 세션 상태 초기화 및 새로고침 대응(URL 쿼리 파라미터 복구) ---
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+if "current_author" not in st.session_state:
+    st.session_state["current_author"] = None
+if "login_author" not in st.session_state:
+    st.session_state["login_author"] = None
+
+# 새로고침 시 URL에 로그인 정보가 남아있다면 자동 인증 처리
+if not st.session_state["authenticated"]:
+    if st.query_params.get("logged_in") == "true" and st.query_params.get("author"):
+        st.session_state["authenticated"] = True
+        st.session_state["current_author"] = st.query_params.get("author")
+
 # --- 🎨 로그인 화면 전용 정사각형 버튼 및 두 배 큰 글씨 스타일링 ---
-if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
+if not st.session_state["authenticated"]:
     st.markdown("""
     <style>
     div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button {
@@ -129,17 +146,6 @@ if "authenticated" not in st.session_state or not st.session_state["authenticate
     """, unsafe_allow_html=True)
 
 st.markdown('<a href="#timeline_anchor" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
-
-FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
-FAMILY_PIN = st.secrets.get("FAMILY_PIN", "123456")
-
-# --- 세션 상태 초기화 ---
-if "authenticated" not in st.session_state:
-    st.session_state["authenticated"] = False
-if "current_author" not in st.session_state:
-    st.session_state["current_author"] = None
-if "login_author" not in st.session_state:
-    st.session_state["login_author"] = None
 
 # --- 1. 가족 전용 바둑판식 로그인 화면 ---
 if not st.session_state["authenticated"]:
@@ -187,6 +193,9 @@ if not st.session_state["authenticated"]:
                     st.session_state["authenticated"] = True
                     st.session_state["current_author"] = selected_name
                     st.session_state["login_author"] = None
+                    # 새로고침해도 유지되도록 URL 쿼리 파라미터 저장
+                    st.query_params["logged_in"] = "true"
+                    st.query_params["author"] = selected_name
                     st.rerun()
                 else:
                     st.error("비밀번호가 올바르지 않습니다.")
@@ -340,6 +349,8 @@ with col_top_right:
     if st.button(f"나가기", key="btn_logout", use_container_width=True):
         st.session_state["authenticated"] = False
         st.session_state["current_author"] = None
+        # 로그아웃 시 쿼리 파라미터 초기화
+        st.query_params.clear()
         st.rerun()
 
 if st.session_state["show_upload_form"]:
