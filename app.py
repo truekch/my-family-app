@@ -1,28 +1,18 @@
 import streamlit as st
 import json
-import os
-import base64
+import io
+import time
 from datetime import datetime
 from google.oauth2.credentials import Credentials
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 from googleapiclient.errors import HttpError
-import io
-import time
-from PIL import Image, ImageOps
-
-# HEIC 지원 라이브러리 예외 처리
-try:
-    from pillow_heif import register_heif_opener
-    register_heif_opener()
-except Exception:
-    pass
 
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️", layout="centered")
 
-# --- 🎨 모바일 최적화 & CSS ---
+# --- 🎨 모바일 최적화 & Lightbox CSS ---
 st.markdown("""
 <style>
 html {
@@ -142,15 +132,15 @@ except Exception as e:
     st.error(f"Google Drive 연결 초기화 실패: {e}")
     st.stop()
 
-# --- 3. API 재시도 및 메모리 초과 방지 최적화 함수 ---
+# --- 3. 경량화된 Drive 통신 함수 ---
 
-def execute_with_retry(func, retries=3, delay=1):
+def execute_with_retry(func, retries=2, delay=1):
     for i in range(retries):
         try:
             return func()
         except HttpError as err:
             if err.resp.status in [429, 500, 502, 503, 504] and i < retries - 1:
-                time.sleep(delay * (i + 1))
+                time.sleep(delay)
                 continue
             raise err
         except Exception as e:
@@ -159,59 +149,24 @@ def execute_with_retry(func, retries=3, delay=1):
                 continue
             raise e
 
-# 💡 메모리 누수 방지: 캐시 항목을 최대 10개로 엄격히 제한
-@st.cache_data(ttl=600, max_entries=10, show_spinner=False)
-def download_image_b64(file_id):
-    if not file_id:
-        return None
-    
-    def _download():
-        request = drive_service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while not done:
-            _, done = downloader.next_chunk()
-        return fh.getvalue()
-
-    try:
-        img_bytes = execute_with_retry(_download)
-        img = Image.open(io.BytesIO(img_bytes))
-        img = ImageOps.exif_transpose(img)
-        
-        # 아이폰/안드로이드 호환을 위해 가로/세로 최대 800px 경량화
-        img.thumbnail((800, 800), Image.Resampling.LANCZOS)
-        
-        if img.mode != 'RGB':
-            img = img.convert('RGB')
-
-        buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=75, optimize=True)
-        b64_res = base64.b64encode(buffered.getvalue()).decode('utf-8')
-        
-        buffered.close()
-        return b64_res
-    except Exception:
-        return None
-
-def download_file_bytes(file_id):
-    def _download():
-        request = drive_service.files().get_media(fileId=file_id)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request)
-        done = False
-        while not done:
-            _, done = downloader.next_chunk()
-        return fh.getvalue()
-    return execute_with_retry(_download)
-
 def upload_file_to_drive(file_bytes, file_name, mime_type):
     def _upload():
+        # 공개 권한이 설정되어 링크로 이미지 렌더링이 가능하도록 구성
         file_metadata = {'name': file_name, 'parents': [FOLDER_ID]}
         fh = io.BytesIO(file_bytes)
         media = MediaIoBaseUpload(fh, mimetype=mime_type, resumable=False)
         res = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         fh.close()
+        
+        # 외부 직접 링크 렌더링을 위해 Anyone Read 권한 부여
+        try:
+            drive_service.permissions().create(
+                fileId=res.get('id'),
+                body={'type': 'anyone', 'role': 'reader'}
+            ).execute()
+        except Exception:
+            pass
+            
         return res
     
     res = execute_with_retry(_upload)
@@ -224,6 +179,19 @@ def delete_file_from_drive(file_id):
         execute_with_retry(lambda: drive_service.files().delete(fileId=file_id).execute())
     except Exception:
         pass
+
+def download_file_bytes(file_id):
+    def _download():
+        request = drive_service.files().get_media(fileId=file_id)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+        val = fh.getvalue()
+        fh.close()
+        return val
+    return execute_with_retry(_download)
 
 def load_posts():
     try:
@@ -263,7 +231,6 @@ def save_posts(posts_data, file_id=None):
         fh.close()
 
     execute_with_retry(_save)
-    st.cache_data.clear()
 
 # --- 4. 메인 화면 ---
 posts, posts_file_id = load_posts()
@@ -284,7 +251,7 @@ if st.session_state["show_upload_form"]:
     with st.form("upload_form", clear_on_submit=True):
         st.subheader("✏️ 새로운 추억 남기기")
         author = st.selectbox("작성자", FAMILY_MEMBERS)
-        photos = st.file_uploader("사진 선택 (여러 장 가능)", type=["jpg", "jpeg", "png", "heic", "webp"], accept_multiple_files=True)
+        photos = st.file_uploader("사진 선택 (여러 장 가능)", type=["jpg", "jpeg", "png", "webp"], accept_multiple_files=True)
         caption = st.text_area("오늘 어떤 일이 있었나요?")
         submitted = st.form_submit_button("가족 기록 올리기")
 
@@ -354,10 +321,6 @@ else:
         
         with col_menu:
             with st.popover("⋮", key=f"popover_{p_id}_{pop_key}"):
-                if st.button("✏️ 수정하기", key=f"pop_btn_edit_{p_id}_{pop_key}", use_container_width=True):
-                    st.session_state[f"mode_{p_id}"] = "edit" if st.session_state.get(f"mode_{p_id}") != "edit" else None
-                    st.session_state[f"pop_key_{p_id}"] += 1
-                    st.rerun()
                 if st.button("🗑️ 삭제하기", key=f"pop_btn_del_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "delete" if st.session_state.get(f"mode_{p_id}") != "delete" else None
                     st.session_state[f"pop_key_{p_id}"] += 1
@@ -382,22 +345,22 @@ else:
                         st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
 
+        # 🖼️ 메모리 부하 제로: Google Drive 다이렉트 CDN URL 사용
         if p_ids:
             cols = st.columns(min(len(p_ids), 2))
             for img_idx, img_id in enumerate(p_ids):
-                b64_str = download_image_b64(img_id)
-                if b64_str:
-                    with cols[img_idx % 2]:
-                        st.markdown(f'''
-                        <details class="lightbox-details">
-                            <summary>
-                                <img src="data:image/jpeg;base64,{b64_str}" style="width:100%; border-radius:8px; margin-bottom:10px;">
-                                <div class="lightbox-overlay">
-                                    <img src="data:image/jpeg;base64,{b64_str}">
-                                </div>
-                            </summary>
-                        </details>
-                        ''', unsafe_allow_html=True)
+                img_url = f"https://lh3.googleusercontent.com/d/{img_id}"
+                with cols[img_idx % 2]:
+                    st.markdown(f'''
+                    <details class="lightbox-details">
+                        <summary>
+                            <img src="{img_url}" loading="lazy" style="width:100%; border-radius:8px; margin-bottom:10px; object-fit:cover; max-height:300px;">
+                            <div class="lightbox-overlay">
+                                <img src="{img_url}">
+                            </div>
+                        </summary>
+                    </details>
+                    ''', unsafe_allow_html=True)
 
         st.write(post["caption"])
 
