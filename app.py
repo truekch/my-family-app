@@ -454,25 +454,24 @@ else:
                         st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
 
-        # 🖼️ 구글 드라이브 이미지 출력 (CSS 다단 레이아웃을 적용하여 빈 공간 없이 촘촘하게 정렬)
+        # 🖼️ 구글 드라이브 이미지 출력 (스트림릿 네이티브 st.columns를 사용해 2개씩 안전하게 행 단위로 정렬)
         if p_ids:
-            img_html = '<div style="column-count: 2; column-gap: 8px; width: 100%;">'
-            for img_id in p_ids:
-                img_url = f"https://lh3.googleusercontent.com/d/{img_id}"
-                img_html += f'''
-                <div style="break-inside: avoid; margin-bottom: 8px;">
-                    <details class="lightbox-details">
-                        <summary>
-                            <img src="{img_url}" loading="lazy" onerror="this.onerror=null;this.src='https://via.placeholder.com/400x300?text=Image+Loading+Error';" style="width:100%; border-radius:8px; display:block; object-fit:cover;">
-                            <div class="lightbox-overlay">
-                                <img src="{img_url}">
-                            </div>
-                        </summary>
-                    </details>
-                </div>
-                '''
-            img_html += '</div>'
-            st.markdown(img_html, unsafe_allow_html=True)
+            for i in range(0, len(p_ids), 2):
+                row_imgs = p_ids[i:i+2]
+                cols = st.columns(len(row_imgs))
+                for j, img_id in enumerate(row_imgs):
+                    img_url = f"https://lh3.googleusercontent.com/d/{img_id}"
+                    with cols[j]:
+                        st.markdown(f'''
+                        <details class="lightbox-details">
+                            <summary>
+                                <img src="{img_url}" loading="lazy" onerror="this.onerror=null;this.src='https://via.placeholder.com/400x300?text=Image+Loading+Error';" style="width:100%; border-radius:8px; margin-bottom:10px; object-fit:cover; max-height:250px;">
+                                <div class="lightbox-overlay">
+                                    <img src="{img_url}">
+                                </div>
+                            </summary>
+                        </details>
+                        ''', unsafe_allow_html=True)
 
         st.write(post["caption"])
 
