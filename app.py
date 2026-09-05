@@ -337,7 +337,7 @@ with col_top_left:
     if st.button("📸 새 기록 남기기", key="toggle_upload_btn", use_container_width=True):
         st.session_state["show_upload_form"] = not st.session_state["show_upload_form"]
 with col_top_right:
-    if st.button(f"👤 {current_user} (나가기)", key="btn_logout", use_container_width=True):
+    if st.button(f"👤 나가기", key="btn_logout", use_container_width=True):
         st.session_state["authenticated"] = False
         st.session_state["current_author"] = None
         st.rerun()
