@@ -470,7 +470,6 @@ else:
             
             with st.form(f"comment_form_{p_id}", clear_on_submit=True):
                 st.markdown(f"💬 **{current_user}** 님 이름으로 댓글 남기기")
-                c_text = st.text_input("댓글 내용 입력...", key=f"c_text_{p_id}")
                 if st.form_submit_button("댓글 등록"):
                     if c_text.strip():
                         updated_posts = copy.deepcopy(posts)
