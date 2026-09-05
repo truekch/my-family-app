@@ -152,22 +152,22 @@ if not st.session_state["authenticated"]:
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("👨\n\n창협", use_container_width=True, key="btn_member_0"):
+            if st.button("🐵\n\n창협", use_container_width=True, key="btn_member_0"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[0]
                 st.rerun()
         with col2:
-            if st.button("👩\n\n지원", use_container_width=True, key="btn_member_1"):
+            if st.button("🐶\n\n지원", use_container_width=True, key="btn_member_1"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[1]
                 st.rerun()
                 
         st.write("")
         col3, col4 = st.columns(2)
         with col3:
-            if st.button("👧\n\n채영", use_container_width=True, key="btn_member_2"):
+            if st.button("🐲\n\n채영", use_container_width=True, key="btn_member_2"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[2]
                 st.rerun()
         with col4:
-            if st.button("👸\n\n서영", use_container_width=True, key="btn_member_3"):
+            if st.button("🐴\n\n서영", use_container_width=True, key="btn_member_3"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[3]
                 st.rerun()
         st.stop()
@@ -452,7 +452,7 @@ else:
                     st.markdown(f'''
                     <details class="lightbox-details">
                         <summary>
-                            <img src="{img_url}" loading="lazy" onerror="this.onerror=null;this.src='https://via.placeholder.com/400x300?text=Image+Loading...';" style="width:100%; border-radius:8px; margin-bottom:10px; object-fit:cover; max-height:300px;">
+                            <img src="{img_url}" loading="lazy" onerror="this.onerror=null;this.src='https://via.placeholder.com/400x300?text=Image+Loading+Error';" style="width:100%; border-radius:8px; margin-bottom:10px; object-fit:cover; max-height:300px;">
                             <div class="lightbox-overlay">
                                 <img src="{img_url}">
                             </div>
