@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️", layout="centered")
 
-# --- 🎨 모바일 최적화 & 아이폰(iOS) Safari 호환성 강화 CSS ---
+# --- 🎨 모바일 최적화 & 타이틀 한줄 정렬 CSS ---
 st.markdown("""
 <style>
 * {
@@ -23,6 +23,14 @@ html {
     scroll-behavior: smooth;
 }
 @media (max-width: 640px) {
+    h1 {
+        font-size: 22px !important;
+        white-space: nowrap !important;
+    }
+    h3 {
+        font-size: 16px !important;
+        white-space: nowrap !important;
+    }
     div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
@@ -94,7 +102,7 @@ details.lightbox-details[open] .lightbox-overlay img {
 </style>
 """, unsafe_allow_html=True)
 
-# --- 🎨 로그인 화면 전용 정사각형 버튼 CSS 스타일링 ---
+# --- 🎨 로그인 화면 전용 정사각형 버튼 및 두 배 큰 글씨 스타일링 ---
 if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
     st.markdown("""
     <style>
@@ -102,7 +110,7 @@ if "authenticated" not in st.session_state or not st.session_state["authenticate
         aspect-ratio: 1 / 1 !important;
         width: 100% !important;
         border-radius: 20px !important;
-        font-size: 18px !important;
+        font-size: 32px !important;
         font-weight: bold !important;
         background-color: #ffffff !important;
         border: 2px solid #e2e8f0 !important;
@@ -156,7 +164,7 @@ if not st.session_state["authenticated"]:
                 st.session_state["login_author"] = FAMILY_MEMBERS[2]
                 st.rerun()
         with col4:
-            if st.button("🧒\n\n서영", use_container_width=True, key="btn_member_3"):
+            if st.button("👧\n\n서영", use_container_width=True, key="btn_member_3"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[3]
                 st.rerun()
         st.stop()
