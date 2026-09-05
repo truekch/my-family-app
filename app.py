@@ -475,9 +475,9 @@ else:
 
         st.write(post["caption"])
 
-        # 😊 [추가] 빠른 이모지 반응 버튼 바 (댓글 기능 기반으로 안전하게 동작)
-        emoji_cols = st.columns(4)
-        quick_emojis = ["❤️", "👍", "😂", "👏"]
+        # 😊 [수정] 빠른 이모지 반응 버튼 바 (6개로 확대)
+        emoji_cols = st.columns(6)
+        quick_emojis = ["❤️", "👍", "😂", "👏", "🔥", "🥹"]
         for e_idx, q_emoji in enumerate(quick_emojis):
             with emoji_cols[e_idx]:
                 if st.button(q_emoji, key=f"emoji_btn_{p_id}_{e_idx}", use_container_width=True):
@@ -495,7 +495,7 @@ else:
                     save_posts(updated_posts, posts_file_id)
                     st.rerun()
 
-        # 💬 댓글 영역
+        # 💬 댓글 영역 (입력창 한 줄로 깔끔하게 정리)
         comments = post.get("comments", [])
         with st.expander(f"💬 댓글 ({len(comments)}개)"):
             for c in comments:
@@ -503,7 +503,7 @@ else:
             
             with st.form(f"comment_form_{p_id}", clear_on_submit=True):
                 st.markdown(f"💬 **{current_user}** 님 이름으로 댓글 남기기")
-                c_text = st.text_input("댓글 내용 입력...", key=f"c_text_{p_id}")
+                c_text = st.text_input("댓글 내용 입력", label_visibility="collapsed", placeholder="댓글 내용을 입력하세요...", key=f"c_text_{p_id}")
                 if st.form_submit_button("댓글 등록"):
                     if c_text.strip():
                         updated_posts = copy.deepcopy(posts)
