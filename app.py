@@ -104,16 +104,15 @@ details.lightbox-details[open] .lightbox-overlay img {
 </style>
 """, unsafe_allow_html=True)
 
-# --- 🎨 로그인 화면 버튼 크기 세분화 스타일링 ---
+# --- 🎨 로그인 화면 전용 정사각형 버튼 및 2배 커진 글씨 스타일링 ---
 if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
     st.markdown("""
     <style>
-    /* 이름 선택 버튼 (40px, 정사각형) */
     div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button {
         aspect-ratio: 1 / 1 !important;
         width: 100% !important;
         border-radius: 20px !important;
-        font-size: 40px !important;
+        font-size: 64px !important;
         font-weight: bold !important;
         background-color: #ffffff !important;
         border: 2px solid #e2e8f0 !important;
@@ -122,22 +121,10 @@ if "authenticated" not in st.session_state or not st.session_state["authenticate
         color: #1a202c !important;
     }
     div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button p {
-        font-size: 40px !important;
+        font-size: 64px !important;
         font-weight: bold !important;
         color: #1a202c !important;
     }
-    
-    /* 비밀번호 입력 화면의 '입장하기', '← 이름 다시 선택' 버튼 (32px로 조정) */
-    div[data-testid="stTextInput"] ~ div div[data-testid="stButton"] button,
-    div[data-testid="stTextInput"] ~ div div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button {
-        aspect-ratio: auto !important;
-        font-size: 32px !important;
-    }
-    div[data-testid="stTextInput"] ~ div div[data-testid="stButton"] button p,
-    div[data-testid="stTextInput"] ~ div div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button p {
-        font-size: 32px !important;
-    }
-
     div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button:hover {
         border-color: #3182ce !important;
         background-color: #ebf8ff !important;
@@ -355,7 +342,7 @@ with col_top_left:
     if st.button("📸 새 기록 남기기", key="toggle_upload_btn", use_container_width=True):
         st.session_state["show_upload_form"] = not st.session_state["show_upload_form"]
 with col_top_right:
-    if st.button(f"👤 {current_user} (나가기)", key="btn_logout", use_container_width=True):
+    if st.button(f"나가기", key="btn_logout", use_container_width=True):
         st.session_state["authenticated"] = False
         st.session_state["current_author"] = None
         st.rerun()
