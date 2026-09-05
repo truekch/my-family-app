@@ -454,7 +454,7 @@ else:
                         st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
 
-        # 🖼️ 구글 드라이브 이미지 출력 (세로로 긴 사진도 전체가 다 나오도록 height: auto 적용)
+        # 🖼️ 구글 드라이브 이미지 출력
         if p_ids:
             for i in range(0, len(p_ids), 2):
                 row_imgs = p_ids[i:i+2]
@@ -474,6 +474,26 @@ else:
                         ''', unsafe_allow_html=True)
 
         st.write(post["caption"])
+
+        # 😊 [추가] 빠른 이모지 반응 버튼 바 (댓글 기능 기반으로 안전하게 동작)
+        emoji_cols = st.columns(4)
+        quick_emojis = ["❤️", "👍", "😂", "👏"]
+        for e_idx, q_emoji in enumerate(quick_emojis):
+            with emoji_cols[e_idx]:
+                if st.button(q_emoji, key=f"emoji_btn_{p_id}_{e_idx}", use_container_width=True):
+                    updated_posts = copy.deepcopy(posts)
+                    for original_post in updated_posts:
+                        if original_post.get("id") == post.get("id"):
+                            if "comments" not in original_post:
+                                original_post["comments"] = []
+                            original_post["comments"].append({
+                                "author": current_user,
+                                "text": q_emoji,
+                                "date": datetime.now().strftime("%m/%d %H:%M")
+                            })
+                            break
+                    save_posts(updated_posts, posts_file_id)
+                    st.rerun()
 
         # 💬 댓글 영역
         comments = post.get("comments", [])
