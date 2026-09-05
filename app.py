@@ -26,7 +26,7 @@ html {
     div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 6px !important;
+        gap: 8px !important;
     }
     div[data-testid="stColumn"] {
         min-width: 0 !important;
@@ -41,7 +41,7 @@ div[data-testid="stButton"] button {
 div[data-testid="stButton"] button p {
     white-space: nowrap !important;
     word-break: keep-all !important;
-    font-size: 14px !important;
+    font-size: 15px !important;
     font-weight: bold !important;
 }
 .scroll-to-top {
@@ -94,6 +94,29 @@ details.lightbox-details[open] .lightbox-overlay img {
 </style>
 """, unsafe_allow_html=True)
 
+# --- 🎨 로그인 화면 전용 정사각형 버튼 CSS 스타일링 ---
+if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
+    st.markdown("""
+    <style>
+    div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button {
+        aspect-ratio: 1 / 1 !important;
+        width: 100% !important;
+        border-radius: 20px !important;
+        font-size: 18px !important;
+        font-weight: bold !important;
+        background-color: #ffffff !important;
+        border: 2px solid #e2e8f0 !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
+        transition: all 0.2s ease !important;
+    }
+    div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button:hover {
+        border-color: #3182ce !important;
+        background-color: #ebf8ff !important;
+        transform: translateY(-2px);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.markdown('<a href="#timeline_anchor" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
 
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
@@ -111,29 +134,29 @@ if "login_author" not in st.session_state:
 if not st.session_state["authenticated"]:
     st.title("🔒 우리 가족 전용 공간")
     
-    # 1단계: 가족 이름 선택 (2x2 바둑판 버튼)
+    # 1단계: 가족 이름 선택 (2x2 정사각형 바둑판 버튼)
     if not st.session_state["login_author"]:
-        st.markdown("### 👋 사용할 사람을 선택해 주세요")
+        st.markdown("### 👋 기록을 남길 분을 선택해 주세요")
         st.write("")
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button(f"🧑  {FAMILY_MEMBERS[0]}", use_container_width=True, key="btn_member_0"):
+            if st.button("👨\n\n창협", use_container_width=True, key="btn_member_0"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[0]
-                st.rer() if hasattr(st, "rer") else st.rerun()
+                st.rerun()
         with col2:
-            if st.button(f"👩  {FAMILY_MEMBERS[1]}", use_container_width=True, key="btn_member_1"):
+            if st.button("👩\n\n지원", use_container_width=True, key="btn_member_1"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[1]
                 st.rerun()
                 
         st.write("")
         col3, col4 = st.columns(2)
         with col3:
-            if st.button(f"👧  {FAMILY_MEMBERS[2]}", use_container_width=True, key="btn_member_2"):
+            if st.button("👧\n\n채영", use_container_width=True, key="btn_member_2"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[2]
                 st.rerun()
         with col4:
-            if st.button(f"👦  {FAMILY_MEMBERS[3]}", use_container_width=True, key="btn_member_3"):
+            if st.button("🧒\n\n서영", use_container_width=True, key="btn_member_3"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[3]
                 st.rerun()
         st.stop()
@@ -141,7 +164,7 @@ if not st.session_state["authenticated"]:
     # 2단계: PIN 번호 입력
     else:
         selected_name = st.session_state["login_author"]
-        st.markdown(f"### ✨ **{selected_name}** 님 환영합니다!")
+        st.markdown(f"### ✨ **{selected_name}** 님, 환영합니다!")
         st.write("가족 전용 비밀번호 6자리를 입력해 주세요.")
         
         pin_input = st.text_input("비밀번호", type="password", key="pin_input_field")
@@ -331,7 +354,7 @@ if st.session_state["show_upload_form"]:
                         
                         new_post = {
                             "id": timestamp,
-                            "author": current_user,  # 로그인된 사용자 자동 반영
+                            "author": current_user,
                             "photo_ids": photo_ids,
                             "caption": caption,
                             "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M"),
@@ -384,7 +407,6 @@ else:
             st.markdown(f"**{post['author']}** · `{post['date']}`")
         
         with col_menu:
-            # 본인이 작성한 글이거나 관리자(창협)인 경우에만 삭제 메뉴 허용 등의 확장성 고려 가능하지만 기본 유지
             with st.popover("⋮", key=f"popover_{p_id}_{pop_key}"):
                 if st.button("🗑️ 삭제하기", key=f"pop_btn_del_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "delete" if st.session_state.get(f"mode_{p_id}") != "delete" else None
@@ -410,7 +432,7 @@ else:
                         st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
 
-        # 🖼️ 구글 드라이브 이미지 출력 (오류 발생 시 대체 이미지 및 라이트박스 적용)
+        # 🖼️ 구글 드라이브 이미지 출력
         if p_ids:
             cols = st.columns(min(len(p_ids), 2))
             for img_idx, img_id in enumerate(p_ids):
@@ -429,7 +451,7 @@ else:
 
         st.write(post["caption"])
 
-        # 💬 댓글 영역 (댓글 작성자도 로그인된 이름으로 자동 반영)
+        # 💬 댓글 영역
         comments = post.get("comments", [])
         with st.expander(f"💬 댓글 ({len(comments)}개)"):
             for c in comments:
@@ -446,7 +468,7 @@ else:
                                 if "comments" not in original_post:
                                     original_post["comments"] = []
                                 original_post["comments"].append({
-                                    "author": current_user,  # 로그인된 사용자 자동 반영
+                                    "author": current_user,
                                     "text": c_text,
                                     "date": datetime.now().strftime("%m/%d %H:%M")
                                 })
