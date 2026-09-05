@@ -16,7 +16,6 @@ st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="�
 # --- 🎨 모바일 최적화 & 아이폰(iOS) Safari 호환성 강화 CSS ---
 st.markdown("""
 <style>
-/* 아이폰 사파리 터치 시 깜빡임 방지 및 스크롤 부드럽게 */
 * {
     -webkit-tap-highlight-color: transparent;
 }
@@ -35,14 +34,15 @@ html {
 }
 div[data-testid="stButton"] button {
     padding: 4px 8px !important;
-    min-height: 36px !important;
+    min-height: 42px !important;
     white-space: nowrap !important;
     word-break: keep-all !important;
 }
 div[data-testid="stButton"] button p {
     white-space: nowrap !important;
     word-break: keep-all !important;
-    font-size: 13px !important;
+    font-size: 14px !important;
+    font-weight: bold !important;
 }
 .scroll-to-top {
     position: fixed !important;
@@ -63,7 +63,7 @@ div[data-testid="stButton"] button p {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* --- 사진 확대(Lightbox) 오류 수정 영역 --- */
+/* --- 사진 확대(Lightbox) 스타일 --- */
 details.lightbox-details summary {
     list-style: none !important;
     cursor: pointer;
@@ -71,11 +71,9 @@ details.lightbox-details summary {
 details.lightbox-details summary::-webkit-details-marker {
     display: none !important;
 }
-/* 평소에는 오버레이용 사진을 숨겨서 중복 노출을 방지합니다. */
 .lightbox-overlay {
     display: none;
 }
-/* 사진을 터치(클릭)했을 때만 오버레이를 전체화면으로 띄웁니다. */
 details.lightbox-details[open] .lightbox-overlay {
     display: flex !important;
     position: fixed !important;
@@ -99,25 +97,70 @@ details.lightbox-details[open] .lightbox-overlay img {
 st.markdown('<a href="#timeline_anchor" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
 
 FAMILY_MEMBERS = ["창협", "지원", "채영", "서영"]
-
-# --- 1. 가족 전용 비밀번호(PIN) 인증 ---
 FAMILY_PIN = st.secrets.get("FAMILY_PIN", "123456")
 
+# --- 세션 상태 초기화 ---
 if "authenticated" not in st.session_state:
     st.session_state["authenticated"] = False
+if "current_author" not in st.session_state:
+    st.session_state["current_author"] = None
+if "login_author" not in st.session_state:
+    st.session_state["login_author"] = None
 
+# --- 1. 가족 전용 바둑판식 로그인 화면 ---
 if not st.session_state["authenticated"]:
     st.title("🔒 우리 가족 전용 공간")
-    st.write("가족 전용 비밀번호(PIN)를 입력해 주세요.")
     
-    pin_input = st.text_input("비밀번호 6자리", type="password", key="pin_input_field")
-    if st.button("접속하기", key="btn_login"):
-        if pin_input == FAMILY_PIN:
-            st.session_state["authenticated"] = True
-            st.rerun()
-        else:
-            st.error("비밀번호가 올바르지 않습니다.")
-    st.stop()
+    # 1단계: 가족 이름 선택 (2x2 바둑판 버튼)
+    if not st.session_state["login_author"]:
+        st.markdown("### 👋 사용할 사람을 선택해 주세요")
+        st.write("")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button(f"🧑  {FAMILY_MEMBERS[0]}", use_container_width=True, key="btn_member_0"):
+                st.session_state["login_author"] = FAMILY_MEMBERS[0]
+                st.rer() if hasattr(st, "rer") else st.rerun()
+        with col2:
+            if st.button(f"👩  {FAMILY_MEMBERS[1]}", use_container_width=True, key="btn_member_1"):
+                st.session_state["login_author"] = FAMILY_MEMBERS[1]
+                st.rerun()
+                
+        st.write("")
+        col3, col4 = st.columns(2)
+        with col3:
+            if st.button(f"👧  {FAMILY_MEMBERS[2]}", use_container_width=True, key="btn_member_2"):
+                st.session_state["login_author"] = FAMILY_MEMBERS[2]
+                st.rerun()
+        with col4:
+            if st.button(f"👦  {FAMILY_MEMBERS[3]}", use_container_width=True, key="btn_member_3"):
+                st.session_state["login_author"] = FAMILY_MEMBERS[3]
+                st.rerun()
+        st.stop()
+    
+    # 2단계: PIN 번호 입력
+    else:
+        selected_name = st.session_state["login_author"]
+        st.markdown(f"### ✨ **{selected_name}** 님 환영합니다!")
+        st.write("가족 전용 비밀번호 6자리를 입력해 주세요.")
+        
+        pin_input = st.text_input("비밀번호", type="password", key="pin_input_field")
+        
+        col_login, col_back = st.columns(2)
+        with col_login:
+            if st.button("입장하기", type="primary", use_container_width=True, key="btn_do_login"):
+                if pin_input == FAMILY_PIN:
+                    st.session_state["authenticated"] = True
+                    st.session_state["current_author"] = selected_name
+                    st.session_state["login_author"] = None
+                    st.rerun()
+                else:
+                    st.error("비밀번호가 올바르지 않습니다.")
+        with col_back:
+            if st.button("← 이름 다시 선택", use_container_width=True, key="btn_back_name"):
+                st.session_state["login_author"] = None
+                st.rerun()
+        st.stop()
 
 # --- 2. Google OAuth 2.0 및 Drive 서비스 생성 ---
 SCOPES = ['https://www.googleapis.com/auth/drive']
@@ -153,7 +196,7 @@ def execute_with_retry(func, retries=5):
         except HttpError as err:
             if err.resp.status in [403, 429, 500, 502, 503, 504] and i < retries - 1:
                 time.sleep(delay)
-                delay *= 2  # 1초 -> 2초 -> 4초 -> 8초 대기 (API 차단 완벽 방지)
+                delay *= 2
                 continue
             raise err
         except Exception as e:
@@ -205,7 +248,7 @@ def download_file_bytes(file_id):
         return val
     return execute_with_retry(_download)
 
-# --- [핵심 방어] 데이터 강력 캐싱 (API 폭주 완벽 차단) ---
+# --- [핵심 방어] 데이터 강력 캐싱 ---
 @st.cache_data(ttl=60, show_spinner=False)
 def load_posts():
     try:
@@ -245,7 +288,7 @@ def save_posts(posts_data, file_id=None):
         fh.close()
 
     execute_with_retry(_save)
-    load_posts.clear() # [핵심] 글/댓글 작성 시에만 캐시를 초기화하여 최신 상태 즉각 반영
+    load_posts.clear()
 
 # --- 4. 메인 화면 ---
 posts, posts_file_id = load_posts()
@@ -253,19 +296,21 @@ posts, posts_file_id = load_posts()
 if "show_upload_form" not in st.session_state:
     st.session_state["show_upload_form"] = False
 
+current_user = st.session_state.get("current_author", "가족")
+
 col_top_left, col_top_right = st.columns([3, 1])
 with col_top_left:
     if st.button("📸 새 기록 남기기", key="toggle_upload_btn", use_container_width=True):
         st.session_state["show_upload_form"] = not st.session_state["show_upload_form"]
 with col_top_right:
-    if st.button("🔒 잠그기", key="btn_logout", use_container_width=True):
+    if st.button(f"👤 {current_user} (나가기)", key="btn_logout", use_container_width=True):
         st.session_state["authenticated"] = False
+        st.session_state["current_author"] = None
         st.rerun()
 
 if st.session_state["show_upload_form"]:
     with st.form("upload_form", clear_on_submit=True):
-        st.subheader("✏️ 새로운 추억 남기기")
-        author = st.selectbox("작성자", FAMILY_MEMBERS)
+        st.subheader(f"✏️ {current_user} 님의 새로운 추억 남기기")
         photos = st.file_uploader("사진 선택 (여러 장 가능)", type=["jpg", "jpeg", "png", "webp"], accept_multiple_files=True)
         caption = st.text_area("오늘 어떤 일이 있었나요?")
         submitted = st.form_submit_button("가족 기록 올리기")
@@ -286,21 +331,20 @@ if st.session_state["show_upload_form"]:
                         
                         new_post = {
                             "id": timestamp,
-                            "author": author,
+                            "author": current_user,  # 로그인된 사용자 자동 반영
                             "photo_ids": photo_ids,
                             "caption": caption,
                             "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M"),
                             "comments": []
                         }
                         
-                        # 안전한 깊은 복사(Deep Copy)를 통해 스팀릿 캐시 충돌 방지
                         updated_posts = copy.deepcopy(posts)
                         updated_posts.insert(0, new_post)
                         save_posts(updated_posts, posts_file_id)
                         
                         st.session_state["show_upload_form"] = False
                         st.success("🎉 저장되었습니다!")
-                        time.sleep(1) # 저장 후 안정성을 위해 1초 대기
+                        time.sleep(1)
                         st.rerun()
                     except Exception as e:
                         st.error(f"업로드 에러: {e}")
@@ -340,6 +384,7 @@ else:
             st.markdown(f"**{post['author']}** · `{post['date']}`")
         
         with col_menu:
+            # 본인이 작성한 글이거나 관리자(창협)인 경우에만 삭제 메뉴 허용 등의 확장성 고려 가능하지만 기본 유지
             with st.popover("⋮", key=f"popover_{p_id}_{pop_key}"):
                 if st.button("🗑️ 삭제하기", key=f"pop_btn_del_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "delete" if st.session_state.get(f"mode_{p_id}") != "delete" else None
@@ -365,7 +410,7 @@ else:
                         st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
 
-        # 🖼️ 메모리 부하 제로: Google Drive 다이렉트 CDN URL 사용
+        # 🖼️ 구글 드라이브 이미지 출력 (오류 발생 시 대체 이미지 및 라이트박스 적용)
         if p_ids:
             cols = st.columns(min(len(p_ids), 2))
             for img_idx, img_id in enumerate(p_ids):
@@ -374,7 +419,7 @@ else:
                     st.markdown(f'''
                     <details class="lightbox-details">
                         <summary>
-                            <img src="{img_url}" loading="lazy" style="width:100%; border-radius:8px; margin-bottom:10px; object-fit:cover; max-height:300px;">
+                            <img src="{img_url}" loading="lazy" onerror="this.onerror=null;this.src='https://via.placeholder.com/400x300?text=Image+Loading...';" style="width:100%; border-radius:8px; margin-bottom:10px; object-fit:cover; max-height:300px;">
                             <div class="lightbox-overlay">
                                 <img src="{img_url}">
                             </div>
@@ -384,25 +429,24 @@ else:
 
         st.write(post["caption"])
 
-        # 💬 댓글 영역
+        # 💬 댓글 영역 (댓글 작성자도 로그인된 이름으로 자동 반영)
         comments = post.get("comments", [])
         with st.expander(f"💬 댓글 ({len(comments)}개)"):
             for c in comments:
                 st.markdown(f"**{c['author']}** (`{c['date']}`): {c['text']}")
             
             with st.form(f"comment_form_{p_id}", clear_on_submit=True):
-                c_author = st.selectbox("댓글 작성자", FAMILY_MEMBERS, key=f"c_auth_{p_id}")
-                c_text = st.text_input("댓글 내용", key=f"c_text_{p_id}")
-                if st.form_submit_button("댓글 남기기"):
+                st.markdown(f"💬 **{current_user}** 님 이름으로 댓글 남기기")
+                c_text = st.text_input("댓글 내용 입력...", key=f"c_text_{p_id}")
+                if st.form_submit_button("댓글 등록"):
                     if c_text.strip():
-                        # 안전한 깊은 복사(Deep Copy)를 통해 스팀릿 캐시 충돌 방지
                         updated_posts = copy.deepcopy(posts)
                         for original_post in updated_posts:
                             if original_post.get("id") == post.get("id"):
                                 if "comments" not in original_post:
                                     original_post["comments"] = []
                                 original_post["comments"].append({
-                                    "author": c_author,
+                                    "author": current_user,  # 로그인된 사용자 자동 반영
                                     "text": c_text,
                                     "date": datetime.now().strftime("%m/%d %H:%M")
                                 })
