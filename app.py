@@ -104,7 +104,7 @@ details.lightbox-details[open] .lightbox-overlay img {
 </style>
 """, unsafe_allow_html=True)
 
-# --- 🎨 로그인 화면 전용 정사각형 버튼 및 적당한 중간 크기(48px) 스타일링 ---
+# --- 🎨 로그인 화면 전용 정사각형 버튼 및 중간 크기(40px) 스타일링 ---
 if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
     st.markdown("""
     <style>
@@ -112,7 +112,7 @@ if "authenticated" not in st.session_state or not st.session_state["authenticate
         aspect-ratio: 1 / 1 !important;
         width: 100% !important;
         border-radius: 20px !important;
-        font-size: 48px !important;
+        font-size: 40px !important;
         font-weight: bold !important;
         background-color: #ffffff !important;
         border: 2px solid #e2e8f0 !important;
@@ -121,7 +121,7 @@ if "authenticated" not in st.session_state or not st.session_state["authenticate
         color: #1a202c !important;
     }
     div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button p {
-        font-size: 48px !important;
+        font-size: 40px !important;
         font-weight: bold !important;
         color: #1a202c !important;
     }
