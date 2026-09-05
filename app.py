@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️", layout="centered")
 
-# --- 🎨 모바일 최적화 & 타이틀 한줄 정렬 CSS ---
+# --- 🎨 모바일 최적화 & 타이틀 한줄 정렬 및 글씨 크기 개선 CSS ---
 st.markdown("""
 <style>
 * {
@@ -24,11 +24,11 @@ html {
 }
 @media (max-width: 640px) {
     h1 {
-        font-size: 22px !important;
+        font-size: 26px !important;
         white-space: nowrap !important;
     }
     h3 {
-        font-size: 16px !important;
+        font-size: 19px !important;
         white-space: nowrap !important;
     }
     div[data-testid="stHorizontalBlock"] {
@@ -45,12 +45,14 @@ div[data-testid="stButton"] button {
     min-height: 42px !important;
     white-space: nowrap !important;
     word-break: keep-all !important;
+    color: #1a202c !important;
 }
 div[data-testid="stButton"] button p {
     white-space: nowrap !important;
     word-break: keep-all !important;
-    font-size: 15px !important;
+    font-size: 16px !important;
     font-weight: bold !important;
+    color: #1a202c !important;
 }
 .scroll-to-top {
     position: fixed !important;
@@ -116,6 +118,7 @@ if "authenticated" not in st.session_state or not st.session_state["authenticate
         border: 2px solid #e2e8f0 !important;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
         transition: all 0.2s ease !important;
+        color: #1a202c !important;
     }
     div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button:hover {
         border-color: #3182ce !important;
@@ -164,7 +167,7 @@ if not st.session_state["authenticated"]:
                 st.session_state["login_author"] = FAMILY_MEMBERS[2]
                 st.rerun()
         with col4:
-            if st.button("👧\n\n서영", use_container_width=True, key="btn_member_3"):
+            if st.button("👸\n\n서영", use_container_width=True, key="btn_member_3"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[3]
                 st.rerun()
         st.stop()
@@ -179,7 +182,7 @@ if not st.session_state["authenticated"]:
         
         col_login, col_back = st.columns(2)
         with col_login:
-            if st.button("입장하기", type="primary", use_container_width=True, key="btn_do_login"):
+            if st.button("입장하기", use_container_width=True, key="btn_do_login"):
                 if pin_input == FAMILY_PIN:
                     st.session_state["authenticated"] = True
                     st.session_state["current_author"] = selected_name
