@@ -12,9 +12,13 @@ from googleapiclient.errors import HttpError
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️", layout="centered")
 
-# --- 🎨 모바일 최적화 & Lightbox CSS ---
+# --- 🎨 모바일 최적화 & 아이폰(iOS) Safari 호환성 강화 CSS ---
 st.markdown("""
 <style>
+/* 아이폰 사파리 터치 시 깜빡임 방지 및 스크롤 부드럽게 */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
 html {
     scroll-behavior: smooth;
 }
@@ -110,7 +114,7 @@ if not st.session_state["authenticated"]:
 # --- 2. Google OAuth 2.0 및 Drive 서비스 생성 ---
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
-@st.cache_resource
+@st.cache_resource(show_spinner=False)
 def get_drive_service():
     oauth_config = st.secrets["google_oauth"]
     creds = Credentials(
@@ -132,33 +136,33 @@ except Exception as e:
     st.error(f"Google Drive 연결 초기화 실패: {e}")
     st.stop()
 
-# --- 3. 경량화된 Drive 통신 함수 ---
-
-def execute_with_retry(func, retries=2, delay=1):
+# --- 3. [핵심 방어] 구글 API 병목 차단용 백오프 재시도 로직 ---
+def execute_with_retry(func, retries=5): # 가족 4명 동시접속 고려 재시도 5회로 확장
+    delay = 1
     for i in range(retries):
         try:
             return func()
         except HttpError as err:
-            if err.resp.status in [429, 500, 502, 503, 504] and i < retries - 1:
+            if err.resp.status in [403, 429, 500, 502, 503, 504] and i < retries - 1:
                 time.sleep(delay)
+                delay *= 2  # 1초 -> 2초 -> 4초 -> 8초 대기 (API 차단 완벽 방지)
                 continue
             raise err
         except Exception as e:
             if i < retries - 1:
                 time.sleep(delay)
+                delay *= 2
                 continue
             raise e
 
 def upload_file_to_drive(file_bytes, file_name, mime_type):
     def _upload():
-        # 공개 권한이 설정되어 링크로 이미지 렌더링이 가능하도록 구성
         file_metadata = {'name': file_name, 'parents': [FOLDER_ID]}
         fh = io.BytesIO(file_bytes)
         media = MediaIoBaseUpload(fh, mimetype=mime_type, resumable=False)
         res = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         fh.close()
         
-        # 외부 직접 링크 렌더링을 위해 Anyone Read 권한 부여
         try:
             drive_service.permissions().create(
                 fileId=res.get('id'),
@@ -193,6 +197,8 @@ def download_file_bytes(file_id):
         return val
     return execute_with_retry(_download)
 
+# --- [핵심 방어] 데이터 강력 캐싱 (API 폭주 완벽 차단) ---
+@st.cache_data(ttl=60, show_spinner=False)
 def load_posts():
     try:
         def _list_files():
@@ -231,6 +237,7 @@ def save_posts(posts_data, file_id=None):
         fh.close()
 
     execute_with_retry(_save)
+    load_posts.clear() # [핵심] 글/댓글 작성 시에만 캐시를 초기화하여 최신 상태 즉각 반영
 
 # --- 4. 메인 화면 ---
 posts, posts_file_id = load_posts()
@@ -277,10 +284,15 @@ if st.session_state["show_upload_form"]:
                             "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M"),
                             "comments": []
                         }
-                        posts.insert(0, new_post)
-                        save_posts(posts, posts_file_id)
+                        
+                        # 캐시 충돌 방지를 위해 리스트 복사 후 처리
+                        updated_posts = list(posts)
+                        updated_posts.insert(0, new_post)
+                        save_posts(updated_posts, posts_file_id)
+                        
                         st.session_state["show_upload_form"] = False
                         st.success("🎉 저장되었습니다!")
+                        time.sleep(1) # 저장 후 안정성을 위해 1초 대기
                         st.rerun()
                     except Exception as e:
                         st.error(f"업로드 에러: {e}")
@@ -375,7 +387,8 @@ else:
                 c_text = st.text_input("댓글 내용", key=f"c_text_{p_id}")
                 if st.form_submit_button("댓글 남기기"):
                     if c_text.strip():
-                        for original_post in posts:
+                        updated_posts = list(posts) # 안전한 복사
+                        for original_post in updated_posts:
                             if original_post.get("id") == post.get("id"):
                                 if "comments" not in original_post:
                                     original_post["comments"] = []
@@ -385,7 +398,7 @@ else:
                                     "date": datetime.now().strftime("%m/%d %H:%M")
                                 })
                                 break
-                        save_posts(posts, posts_file_id)
+                        save_posts(updated_posts, posts_file_id)
                         st.rerun()
-            
+        
         st.divider()
