@@ -104,7 +104,7 @@ details.lightbox-details[open] .lightbox-overlay img {
 </style>
 """, unsafe_allow_html=True)
 
-# --- 🎨 로그인 화면 전용 정사각형 버튼 및 두 배 큰 글씨 스타일링 ---
+# --- 🎨 로그인 화면 전용 정사각형 버튼 및 2배 커진 글씨 스타일링 ---
 if "authenticated" not in st.session_state or not st.session_state["authenticated"]:
     st.markdown("""
     <style>
@@ -112,12 +112,17 @@ if "authenticated" not in st.session_state or not st.session_state["authenticate
         aspect-ratio: 1 / 1 !important;
         width: 100% !important;
         border-radius: 20px !important;
-        font-size: 32px !important;
+        font-size: 64px !important;
         font-weight: bold !important;
         background-color: #ffffff !important;
         border: 2px solid #e2e8f0 !important;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
         transition: all 0.2s ease !important;
+        color: #1a202c !important;
+    }
+    div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button p {
+        font-size: 64px !important;
+        font-weight: bold !important;
         color: #1a202c !important;
     }
     div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button:hover {
