@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 # 앱 기본 페이지 설정
 st.set_page_config(page_title="우리 가족 파이썬 기록장", page_icon="❤️", layout="centered")
 
-# --- 🎨 모바일 최적화 & 타이틀 한줄 정렬 및 글씨 크기 개선 CSS ---
+# --- 🎨 모바일 최적화 및 UI 스타일링 ---
 st.markdown("""
 <style>
 * {
@@ -21,6 +21,10 @@ st.markdown("""
 }
 html {
     scroll-behavior: smooth;
+}
+/* 입력창 하단의 "Press Enter to submit form" 문구 숨기기 */
+div[data-testid="InputInstructions"] {
+    display: none !important;
 }
 @media (max-width: 640px) {
     h1 {
@@ -475,7 +479,7 @@ else:
 
         st.write(post["caption"])
 
-        # 😊 [수정] 빠른 이모지 반응 버튼 바 (6개로 확대)
+        # 😊 빠른 이모지 반응 버튼 바 (6개)
         emoji_cols = st.columns(6)
         quick_emojis = ["❤️", "👍", "😂", "👏", "🔥", "🥹"]
         for e_idx, q_emoji in enumerate(quick_emojis):
@@ -495,7 +499,7 @@ else:
                     save_posts(updated_posts, posts_file_id)
                     st.rerun()
 
-        # 💬 댓글 영역 (입력창 한 줄로 깔끔하게 정리)
+        # 💬 댓글 영역
         comments = post.get("comments", [])
         with st.expander(f"💬 댓글 ({len(comments)}개)"):
             for c in comments:
