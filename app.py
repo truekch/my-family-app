@@ -454,22 +454,24 @@ else:
                         st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
 
-        # 🖼️ 구글 드라이브 이미지 출력
+        # 🖼️ 구글 드라이브 이미지 출력 (세로로 긴 사진도 전체가 다 나오도록 height: auto 적용)
         if p_ids:
-            cols = st.columns(min(len(p_ids), 2))
-            for img_idx, img_id in enumerate(p_ids):
-                img_url = f"https://lh3.googleusercontent.com/d/{img_id}"
-                with cols[img_idx % 2]:
-                    st.markdown(f'''
-                    <details class="lightbox-details">
-                        <summary>
-                            <img src="{img_url}" loading="lazy" onerror="this.onerror=null;this.src='https://via.placeholder.com/400x300?text=Image+Loading+Error';" style="width:100%; border-radius:8px; margin-bottom:10px; object-fit:cover; max-height:300px;">
-                            <div class="lightbox-overlay">
-                                <img src="{img_url}">
-                            </div>
-                        </summary>
-                    </details>
-                    ''', unsafe_allow_html=True)
+            for i in range(0, len(p_ids), 2):
+                row_imgs = p_ids[i:i+2]
+                cols = st.columns(len(row_imgs))
+                for j, img_id in enumerate(row_imgs):
+                    img_url = f"https://lh3.googleusercontent.com/d/{img_id}"
+                    with cols[j]:
+                        st.markdown(f'''
+                        <details class="lightbox-details">
+                            <summary>
+                                <img src="{img_url}" loading="lazy" onerror="this.onerror=null;this.src='https://via.placeholder.com/400x300?text=Image+Loading+Error';" style="width:100%; height:auto; border-radius:8px; margin-bottom:10px;">
+                                <div class="lightbox-overlay">
+                                    <img src="{img_url}">
+                                </div>
+                            </summary>
+                        </details>
+                        ''', unsafe_allow_html=True)
 
         st.write(post["caption"])
 
