@@ -155,7 +155,6 @@ st.markdown('<a href="#timeline_anchor" class="scroll-to-top">▲</a>', unsafe_a
 if not st.session_state["authenticated"]:
     st.title("🔒 우리 가족 전용 공간")
     
-    # 1단계: 가족 이름 선택 (2x2 정사각형 바둑판 버튼)
     if not st.session_state["login_author"]:
         st.markdown("### 👋 기록을 남길 분을 선택해 주세요")
         st.write("")
@@ -182,7 +181,6 @@ if not st.session_state["authenticated"]:
                 st.rerun()
         st.stop()
     
-    # 2단계: PIN 번호 입력
     else:
         selected_name = st.session_state["login_author"]
         st.markdown(f"### ✨ **{selected_name}** 님, 환영합니다!")
@@ -197,7 +195,6 @@ if not st.session_state["authenticated"]:
                     st.session_state["authenticated"] = True
                     st.session_state["current_author"] = selected_name
                     st.session_state["login_author"] = None
-                    # 새로고침해도 유지되도록 URL 쿼리 파라미터 저장
                     st.query_params["logged_in"] = "true"
                     st.query_params["author"] = selected_name
                     st.rerun()
@@ -234,7 +231,6 @@ except Exception as e:
     st.error(f"Google Drive 연결 초기화 실패: {e}")
     st.stop()
 
-# --- 3. [핵심 방어] 구글 API 병목 차단용 백오프 재시도 로직 ---
 def execute_with_retry(func, retries=5): 
     delay = 1
     for i in range(retries):
@@ -260,7 +256,6 @@ def upload_file_to_drive(file_bytes, file_name, mime_type):
         media = MediaIoBaseUpload(fh, mimetype=mime_type, resumable=False)
         res = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         fh.close()
-        
         try:
             drive_service.permissions().create(
                 fileId=res.get('id'),
@@ -268,9 +263,7 @@ def upload_file_to_drive(file_bytes, file_name, mime_type):
             ).execute()
         except Exception:
             pass
-            
         return res
-    
     res = execute_with_retry(_upload)
     return res.get('id')
 
@@ -295,14 +288,12 @@ def download_file_bytes(file_id):
         return val
     return execute_with_retry(_download)
 
-# --- [핵심 방어] 데이터 강력 캐싱 ---
 @st.cache_data(ttl=60, show_spinner=False)
 def load_posts():
     try:
         def _list_files():
             query = f"'{FOLDER_ID}' in parents and name = 'posts.json' and trashed = false"
             return drive_service.files().list(q=query, fields="files(id)").execute()
-        
         results = execute_with_retry(_list_files)
         files = results.get('files', [])
         if not files:
@@ -315,7 +306,6 @@ def load_posts():
 
 def save_posts(posts_data, file_id=None):
     json_bytes = json.dumps(posts_data, ensure_ascii=False, indent=2).encode('utf-8')
-    
     def _save():
         fh = io.BytesIO(json_bytes)
         media = MediaIoBaseUpload(fh, mimetype='application/json', resumable=False)
@@ -326,14 +316,12 @@ def save_posts(posts_data, file_id=None):
             files = results.get('files', [])
             if files:
                 target_id = files[0]['id']
-
         if target_id:
             drive_service.files().update(fileId=target_id, media_body=media).execute()
         else:
             file_metadata = {'name': 'posts.json', 'parents': [FOLDER_ID]}
             drive_service.files().create(body=file_metadata, media_body=media).execute()
         fh.close()
-
     execute_with_retry(_save)
     load_posts.clear()
 
@@ -353,7 +341,6 @@ with col_top_right:
     if st.button(f"나가기", key="btn_logout", use_container_width=True):
         st.session_state["authenticated"] = False
         st.session_state["current_author"] = None
-        # 로그아웃 시 쿼리 파라미터 초기화
         st.query_params.clear()
         st.rerun()
 
@@ -370,7 +357,6 @@ if st.session_state["show_upload_form"]:
                     try:
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                         photo_ids = []
-                        
                         if photos:
                             for p_idx, photo in enumerate(photos):
                                 photo_name = f"{timestamp}_{p_idx}_{photo.name}"
@@ -386,7 +372,6 @@ if st.session_state["show_upload_form"]:
                             "date": datetime.now().strftime("%Y년 %m월 %d일 %H:%M"),
                             "comments": []
                         }
-                        
                         updated_posts = copy.deepcopy(posts)
                         updated_posts.insert(0, new_post)
                         save_posts(updated_posts, posts_file_id)
@@ -434,11 +419,18 @@ else:
         
         with col_menu:
             with st.popover("⋮", key=f"popover_{p_id}_{pop_key}"):
+                # ✏️ 수정하기 버튼 추가
+                if st.button("✏️ 수정하기", key=f"pop_btn_edit_{p_id}_{pop_key}", use_container_width=True):
+                    st.session_state[f"mode_{p_id}"] = "edit" if st.session_state.get(f"mode_{p_id}") != "edit" else None
+                    st.session_state[f"pop_key_{p_id}"] += 1
+                    st.rerun()
+                # 🗑️ 삭제하기 버튼
                 if st.button("🗑️ 삭제하기", key=f"pop_btn_del_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "delete" if st.session_state.get(f"mode_{p_id}") != "delete" else None
                     st.session_state[f"pop_key_{p_id}"] += 1
                     st.rerun()
 
+        # 삭제 확인 모드 처리
         if st.session_state.get(f"mode_{p_id}") == "delete":
             with st.status("⚠️ 기록 삭제 확인", expanded=True):
                 st.write("정말로 이 기록을 삭제하시겠습니까?")
@@ -457,6 +449,38 @@ else:
                         st.session_state[f"mode_{p_id}"] = None
                         st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
+
+        # 수정 모드 처리
+        if st.session_state.get(f"mode_{p_id}") == "edit":
+            with st.form(f"edit_form_{p_id}"):
+                st.write(f"✏️ **{post['author']}** 님의 기록 수정")
+                edited_caption = st.text_area("내용 수정", value=post["caption"], key=f"edit_text_input_{p_id}")
+                
+                col_e1, col_e2 = st.columns(2)
+                with col_e1:
+                    submitted_edit = st.form_submit_button("저장하기", use_container_width=True)
+                with col_e2:
+                    cancelled_edit = st.form_submit_button("취소", use_container_width=True)
+                
+                if submitted_edit:
+                    if edited_caption.strip():
+                        updated_posts = copy.deepcopy(posts)
+                        for p in updated_posts:
+                            if p.get("id") == post.get("id"):
+                                p["caption"] = edited_caption
+                                break
+                        save_posts(updated_posts, posts_file_id)
+                        st.session_state[f"mode_{p_id}"] = None
+                        st.session_state[f"pop_key_{p_id}"] += 1
+                        st.success("수정되었습니다!")
+                        time.sleep(0.8)
+                        st.rerun()
+                    else:
+                        st.warning("내용을 입력해 주세요.")
+                if cancelled_edit:
+                    st.session_state[f"mode_{p_id}"] = None
+                    st.session_state[f"pop_key_{p_id}"] += 1
+                    st.rerun()
 
         # 🖼️ 구글 드라이브 이미지 출력
         if p_ids:
