@@ -538,7 +538,7 @@ else:
                     save_posts(updated_posts, posts_file_id)
                     st.rerun()
 
-        # 💬 댓글 영역 (댓글 삭제 기능 포함 - 너비 비율 [5, 2]로 조정)
+        # 💬 댓글 영역 (댓글 삭제 버튼에 border=False인 폼 서브밋 버튼을 적용하여 '댓글 등록' 버튼과 폰트 서식 및 높이 완벽 일치)
         comments = post.get("comments", [])
         with st.expander(f"💬 댓글 ({len(comments)}개)"):
             for c_idx, c in enumerate(comments):
@@ -549,17 +549,18 @@ else:
                     st.markdown(f"**{c['author']}** (`{c['date']}`): {c['text']}")
                 with c_col2:
                     if c.get("author") == current_user:
-                        if st.button("삭제", key=f"del_c_{c_id}", use_container_width=True):
-                            updated_posts = copy.deepcopy(posts)
-                            for original_post in updated_posts:
-                                if original_post.get("id") == post.get("id"):
-                                    original_post["comments"] = [
-                                        comm for comm in original_post.get("comments", [])
-                                        if comm.get("id", f"{original_post.get('id')}_c_fallback") != c_id
-                                    ]
-                                    break
-                            save_posts(updated_posts, posts_file_id)
-                            st.rerun()
+                        with st.form(key=f"del_form_{c_id}", border=False):
+                            if st.form_submit_button("삭제", use_container_width=True):
+                                updated_posts = copy.deepcopy(posts)
+                                for original_post in updated_posts:
+                                    if original_post.get("id") == post.get("id"):
+                                        original_post["comments"] = [
+                                            comm for comm in original_post.get("comments", [])
+                                            if comm.get("id", f"{original_post.get('id')}_c_fallback") != c_id
+                                        ]
+                                        break
+                                save_posts(updated_posts, posts_file_id)
+                                st.rerun()
             
             with st.form(f"comment_form_{p_id}", clear_on_submit=True):
                 st.markdown(f"💬 **{current_user}** 님 이름으로 댓글 남기기")
