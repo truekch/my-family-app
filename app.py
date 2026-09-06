@@ -117,61 +117,6 @@ if not st.session_state["authenticated"]:
         st.session_state["authenticated"] = True
         st.session_state["current_author"] = st.query_params.get("author")
 
-# --- 🎨 로그인 화면 전용: 2x2 고정 레이아웃 및 콤팩트한 높이/간격 조정 스타일링 ---
-if not st.session_state["authenticated"]:
-    st.markdown("""
-    <style>
-    /* 모바일 및 모든 기기에서 컬럼이 세로로 쌓이지 않고 2x2 그리드(가로 정렬) 강제 유지 */
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 8px !important;
-    }
-    div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-        flex: 0 0 50% !important;
-        max-width: 50% !important;
-        min-width: 50% !important;
-    }
-    
-    /* 2x2 버튼 박스: 높이를 대폭 낮추고 글씨 크기에 딱 맞게 콤팩트화 */
-    div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button {
-        height: 40px !important;
-        min-height: 40px !important;
-        max-height: 40px !important;
-        padding: 0px !important;
-        width: 100% !important;
-        border-radius: 10px !important;
-        background-color: #ffffff !important;
-        border: 2px solid #e2e8f0 !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04) !important;
-        transition: all 0.2s ease !important;
-        color: #1a202c !important;
-    }
-    div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:hover {
-        border-color: #3182ce !important;
-        background-color: #ebf8ff !important;
-        transform: translateY(-1px);
-    }
-    div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button p {
-        font-size: 16px !important;
-        font-weight: bold !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        color: #1a202c !important;
-    }
-    
-    /* 위쪽 행과 아래쪽 행 사이의 수직 간격을 좌우 간격과 동일하게 밀착 */
-    div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:nth-of-type(1) {
-        margin-bottom: 4px !important;
-    }
-    div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:nth-of-type(2) {
-        margin-top: 0px !important;
-        margin-bottom: 4px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
 st.markdown('<a href="#timeline_anchor" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
 
 # --- 1. 가족 전용 바둑판식 로그인 화면 ---
@@ -179,28 +124,53 @@ if not st.session_state["authenticated"]:
     st.title("🔒 우리 가족 전용 공간")
     
     if not st.session_state["login_author"]:
+        # HTML 그리드 클릭 시 쿼리 파라미터를 통해 세션 반영
+        login_target = st.query_params.get("login_target")
+        if login_target in FAMILY_MEMBERS:
+            st.session_state["login_author"] = login_target
+            st.query_params.clear()
+            st.rerun()
+
         st.markdown("### 👋 기록을 남길 분을 선택해 주세요")
         st.write("")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🐵 창협", use_container_width=True, key="btn_member_0"):
-                st.session_state["login_author"] = FAMILY_MEMBERS[0]
-                st.rerun()
-        with col2:
-            if st.button("🐶 지원", use_container_width=True, key="btn_member_1"):
-                st.session_state["login_author"] = FAMILY_MEMBERS[1]
-                st.rerun()
-                
-        col3, col4 = st.columns(2)
-        with col3:
-            if st.button("🐲 채영", use_container_width=True, key="btn_member_2"):
-                st.session_state["login_author"] = FAMILY_MEMBERS[2]
-                st.rerun()
-        with col4:
-            if st.button("🐴 서영", use_container_width=True, key="btn_member_3"):
-                st.session_state["login_author"] = FAMILY_MEMBERS[3]
-                st.rerun()
+        # 2x2 고정 그리드 (상하/좌우 간격 동일, 높이가 콤팩트한 직사각형 형태)
+        st.markdown("""
+        <style>
+        .login-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+            margin-bottom: 20px;
+        }
+        .login-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 46px;
+            background-color: #ffffff;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: bold;
+            color: #1a202c;
+            text-decoration: none;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            transition: all 0.2s ease;
+        }
+        .login-btn:hover {
+            border-color: #3182ce;
+            background-color: #ebf8ff;
+        }
+        </style>
+        <div class="login-grid">
+            <a href="?login_target=창협" target="_self" class="login-btn">🐵 창협</a>
+            <a href="?login_target=지원" target="_self" class="login-btn">🐶 지원</a>
+            <a href="?login_target=채영" target="_self" class="login-btn">🐲 채영</a>
+            <a href="?login_target=서영" target="_self" class="login-btn">🐴 서영</a>
+        </div>
+        """, unsafe_allow_html=True)
         st.stop()
     
     else:
