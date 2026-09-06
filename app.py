@@ -35,6 +35,14 @@ div[data-testid="InputInstructions"] {
         font-size: 19px !important;
         white-space: nowrap !important;
     }
+    /* 타임라인 페이지 내 모든 st.columns가 모바일에서도 세로로 쌓이지 않고 좌우 나란히(row) 배치되도록 강제 */
+    div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
+        align-items: center !important;
+    }
 }
 div[data-testid="stButton"] button {
     padding: 4px 8px !important;
@@ -124,7 +132,6 @@ if not st.session_state["authenticated"]:
     st.title("🔒 우리 가족 전용 공간")
     
     if not st.session_state["login_author"]:
-        # HTML 그리드 클릭 시 쿼리 파라미터를 통해 세션 반영
         login_target = st.query_params.get("login_target")
         if login_target in FAMILY_MEMBERS:
             st.session_state["login_author"] = login_target
@@ -134,7 +141,6 @@ if not st.session_state["authenticated"]:
         st.markdown("### 👋 기록을 남길 분을 선택해 주세요")
         st.write("")
         
-        # 2x2 고정 그리드 (상하/좌우 간격 동일, 높이가 콤팩트한 직사각형 형태)
         st.markdown("""
         <style>
         .login-grid {
