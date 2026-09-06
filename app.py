@@ -35,14 +35,6 @@ div[data-testid="InputInstructions"] {
         font-size: 19px !important;
         white-space: nowrap !important;
     }
-    /* 타임라인 페이지 내 모든 st.columns가 모바일에서도 세로로 쌓이지 않고 좌우 나란히(row) 배치되도록 강제 */
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 8px !important;
-        align-items: center !important;
-    }
 }
 div[data-testid="stButton"] button {
     padding: 4px 8px !important;
@@ -125,6 +117,30 @@ if not st.session_state["authenticated"]:
         st.session_state["authenticated"] = True
         st.session_state["current_author"] = st.query_params.get("author")
 
+# --- 🎨 로그인 화면 전용 정사각형 버튼 및 두 배 큰 글씨 스타일링 ---
+if not st.session_state["authenticated"]:
+    st.markdown("""
+    <style>
+    div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button {
+        aspect-ratio: 1 / 1 !important;
+        width: 100% !important;
+        border-radius: 20px !important;
+        font-size: 32px !important;
+        font-weight: bold !important;
+        background-color: #ffffff !important;
+        border: 2px solid #e2e8f0 !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
+        transition: all 0.2s ease !important;
+        color: #1a202c !important;
+    }
+    div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button:hover {
+        border-color: #3182ce !important;
+        background-color: #ebf8ff !important;
+        transform: translateY(-2px);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.markdown('<a href="#timeline_anchor" class="scroll-to-top">▲</a>', unsafe_allow_html=True)
 
 # --- 1. 가족 전용 바둑판식 로그인 화면 ---
@@ -132,51 +148,29 @@ if not st.session_state["authenticated"]:
     st.title("🔒 우리 가족 전용 공간")
     
     if not st.session_state["login_author"]:
-        login_target = st.query_params.get("login_target")
-        if login_target in FAMILY_MEMBERS:
-            st.session_state["login_author"] = login_target
-            st.query_params.clear()
-            st.rerun()
-
         st.markdown("### 👋 기록을 남길 분을 선택해 주세요")
         st.write("")
         
-        st.markdown("""
-        <style>
-        .login-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-top: 10px;
-            margin-bottom: 20px;
-        }
-        .login-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 46px;
-            background-color: #ffffff;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 17px;
-            font-weight: bold;
-            color: #1a202c;
-            text-decoration: none;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
-            transition: all 0.2s ease;
-        }
-        .login-btn:hover {
-            border-color: #3182ce;
-            background-color: #ebf8ff;
-        }
-        </style>
-        <div class="login-grid">
-            <a href="?login_target=창협" target="_self" class="login-btn">🐵 창협</a>
-            <a href="?login_target=지원" target="_self" class="login-btn">🐶 지원</a>
-            <a href="?login_target=채영" target="_self" class="login-btn">🐲 채영</a>
-            <a href="?login_target=서영" target="_self" class="login-btn">🐴 서영</a>
-        </div>
-        """, unsafe_allow_html=True)
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🐵\n\n창협", use_container_width=True, key="btn_member_0"):
+                st.session_state["login_author"] = FAMILY_MEMBERS[0]
+                st.rerun()
+        with col2:
+            if st.button("🐶\n\n지원", use_container_width=True, key="btn_member_1"):
+                st.session_state["login_author"] = FAMILY_MEMBERS[1]
+                st.rerun()
+                
+        st.write("")
+        col3, col4 = st.columns(2)
+        with col3:
+            if st.button("🐲\n\n채영", use_container_width=True, key="btn_member_2"):
+                st.session_state["login_author"] = FAMILY_MEMBERS[2]
+                st.rerun()
+        with col4:
+            if st.button("🐴\n\n서영", use_container_width=True, key="btn_member_3"):
+                st.session_state["login_author"] = FAMILY_MEMBERS[3]
+                st.rerun()
         st.stop()
     
     else:
@@ -353,6 +347,7 @@ if st.session_state["show_upload_form"]:
             if caption.strip() != "":
                 with st.spinner("구글 드라이브로 저장 중..."):
                     try:
+                        # 타임스탬프 + 마이크로초를 조합하여 유니크한 ID 생성 (충돌 방지)
                         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                         photo_ids = []
                         if photos:
