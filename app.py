@@ -538,24 +538,21 @@ else:
                     save_posts(updated_posts, posts_file_id)
                     st.rerun()
 
-        # 💬 댓글 영역 (댓글 삭제 기능 포함)
+        # 💬 댓글 영역 (댓글 삭제 기능 포함 - 너비 비율 [5, 2]로 조정)
         comments = post.get("comments", [])
         with st.expander(f"💬 댓글 ({len(comments)}개)"):
             for c_idx, c in enumerate(comments):
-                # 구형 데이터 호환을 위한 고유 ID 설정
                 c_id = c.get("id", f"{p_id}_c_{c_idx}")
                 
-                c_col1, c_col2 = st.columns([6, 1])
+                c_col1, c_col2 = st.columns([5, 2])
                 with c_col1:
                     st.markdown(f"**{c['author']}** (`{c['date']}`): {c['text']}")
                 with c_col2:
-                    # 본인이 작성한 댓글일 경우에만 삭제 버튼 노출 (안전성 및 권한 제어)
                     if c.get("author") == current_user:
                         if st.button("삭제", key=f"del_c_{c_id}", use_container_width=True):
                             updated_posts = copy.deepcopy(posts)
                             for original_post in updated_posts:
                                 if original_post.get("id") == post.get("id"):
-                                    # 해당 댓글 ID를 제외하고 남김
                                     original_post["comments"] = [
                                         comm for comm in original_post.get("comments", [])
                                         if comm.get("id", f"{original_post.get('id')}_c_fallback") != c_id
