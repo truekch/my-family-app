@@ -35,14 +35,6 @@ div[data-testid="InputInstructions"] {
         font-size: 19px !important;
         white-space: nowrap !important;
     }
-    div[data-testid="stHorizontalBlock"] {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 8px !important;
-    }
-    div[data-testid="stColumn"] {
-        min-width: 0 !important;
-    }
 }
 div[data-testid="stButton"] button {
     padding: 4px 8px !important;
@@ -125,15 +117,15 @@ if not st.session_state["authenticated"]:
         st.session_state["authenticated"] = True
         st.session_state["current_author"] = st.query_params.get("author")
 
-# --- 🎨 로그인 화면 전용 정사각형 버튼 및 두 배 큰 글씨 스타일링 ---
+# --- 🎨 로그인 화면 전용: 높이가 절반인 직사각형 버튼 및 좁은 간격 스타일링 ---
 if not st.session_state["authenticated"]:
     st.markdown("""
     <style>
     div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button {
-        aspect-ratio: 1 / 1 !important;
+        aspect-ratio: 2 / 1 !important; /* 정사각형(1/1)에서 높이를 절반으로 축소 */
         width: 100% !important;
-        border-radius: 20px !important;
-        font-size: 32px !important;
+        border-radius: 16px !important;
+        font-size: 22px !important;
         font-weight: bold !important;
         background-color: #ffffff !important;
         border: 2px solid #e2e8f0 !important;
@@ -144,7 +136,14 @@ if not st.session_state["authenticated"]:
     div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button:hover {
         border-color: #3182ce !important;
         background-color: #ebf8ff !important;
-        transform: translateY(-2px);
+        transform: translateY(-1px);
+    }
+    /* 상단 행과 하단 행 사이의 수직 간격을 좌우 간격과 동일하게 축소 */
+    div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:nth-of-type(1) {
+        margin-bottom: 4px !important;
+    }
+    div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:nth-of-type(2) {
+        margin-top: 0px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -161,22 +160,21 @@ if not st.session_state["authenticated"]:
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🐵\n\n창협", use_container_width=True, key="btn_member_0"):
+            if st.button("🐵 창협", use_container_width=True, key="btn_member_0"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[0]
                 st.rerun()
         with col2:
-            if st.button("🐶\n\n지원", use_container_width=True, key="btn_member_1"):
+            if st.button("🐶 지원", use_container_width=True, key="btn_member_1"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[1]
                 st.rerun()
                 
-        st.write("")
         col3, col4 = st.columns(2)
         with col3:
-            if st.button("🐲\n\n채영", use_container_width=True, key="btn_member_2"):
+            if st.button("🐲 채영", use_container_width=True, key="btn_member_2"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[2]
                 st.rerun()
         with col4:
-            if st.button("🐴\n\n서영", use_container_width=True, key="btn_member_3"):
+            if st.button("🐴 서영", use_container_width=True, key="btn_member_3"):
                 st.session_state["login_author"] = FAMILY_MEMBERS[3]
                 st.rerun()
         st.stop()
@@ -355,7 +353,7 @@ if st.session_state["show_upload_form"]:
             if caption.strip() != "":
                 with st.spinner("구글 드라이브로 저장 중..."):
                     try:
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                         photo_ids = []
                         if photos:
                             for p_idx, photo in enumerate(photos):
@@ -419,12 +417,10 @@ else:
         
         with col_menu:
             with st.popover("⋮", key=f"popover_{p_id}_{pop_key}"):
-                # ✏️ 수정하기 버튼 추가
                 if st.button("✏️ 수정하기", key=f"pop_btn_edit_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "edit" if st.session_state.get(f"mode_{p_id}") != "edit" else None
                     st.session_state[f"pop_key_{p_id}"] += 1
                     st.rerun()
-                # 🗑️ 삭제하기 버튼
                 if st.button("🗑️ 삭제하기", key=f"pop_btn_del_{p_id}_{pop_key}", use_container_width=True):
                     st.session_state[f"mode_{p_id}"] = "delete" if st.session_state.get(f"mode_{p_id}") != "delete" else None
                     st.session_state[f"pop_key_{p_id}"] += 1
@@ -450,11 +446,12 @@ else:
                         st.session_state[f"pop_key_{p_id}"] += 1
                         st.rerun()
 
-        # 수정 모드 처리
+        # 수정 모드 처리 (텍스트 수정 + 새로운 사진 추가 가능)
         if st.session_state.get(f"mode_{p_id}") == "edit":
             with st.form(f"edit_form_{p_id}"):
                 st.write(f"✏️ **{post['author']}** 님의 기록 수정")
                 edited_caption = st.text_area("내용 수정", value=post["caption"], key=f"edit_text_input_{p_id}")
+                edited_photos = st.file_uploader("사진 추가 (선택)", type=["jpg", "jpeg", "png", "webp"], accept_multiple_files=True, key=f"edit_photo_input_{p_id}")
                 
                 col_e1, col_e2 = st.columns(2)
                 with col_e1:
@@ -464,17 +461,32 @@ else:
                 
                 if submitted_edit:
                     if edited_caption.strip():
-                        updated_posts = copy.deepcopy(posts)
-                        for p in updated_posts:
-                            if p.get("id") == post.get("id"):
-                                p["caption"] = edited_caption
-                                break
-                        save_posts(updated_posts, posts_file_id)
-                        st.session_state[f"mode_{p_id}"] = None
-                        st.session_state[f"pop_key_{p_id}"] += 1
-                        st.success("수정되었습니다!")
-                        time.sleep(0.8)
-                        st.rerun()
+                        with st.spinner("수정 내용 저장 중..."):
+                            try:
+                                timestamp = post.get("id", datetime.now().strftime("%Y%m%d_%H%M%S"))
+                                new_photo_ids = list(p_ids)
+                                
+                                if edited_photos:
+                                    for p_idx, photo in enumerate(edited_photos):
+                                        photo_name = f"{timestamp}_edit_{p_idx}_{photo.name}"
+                                        mime_type = photo.type if photo.type else 'image/jpeg'
+                                        p_id_new = upload_file_to_drive(photo.getvalue(), photo_name, mime_type)
+                                        new_photo_ids.append(p_id_new)
+                                
+                                updated_posts = copy.deepcopy(posts)
+                                for p in updated_posts:
+                                    if p.get("id") == post.get("id"):
+                                        p["caption"] = edited_caption
+                                        p["photo_ids"] = new_photo_ids
+                                        break
+                                save_posts(updated_posts, posts_file_id)
+                                st.session_state[f"mode_{p_id}"] = None
+                                st.session_state[f"pop_key_{p_id}"] += 1
+                                st.success("수정되었습니다!")
+                                time.sleep(0.8)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"수정 에러: {e}")
                     else:
                         st.warning("내용을 입력해 주세요.")
                 if cancelled_edit:
@@ -515,6 +527,7 @@ else:
                             if "comments" not in original_post:
                                 original_post["comments"] = []
                             original_post["comments"].append({
+                                "id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
                                 "author": current_user,
                                 "text": q_emoji,
                                 "date": datetime.now().strftime("%m/%d %H:%M")
@@ -523,11 +536,28 @@ else:
                     save_posts(updated_posts, posts_file_id)
                     st.rerun()
 
-        # 💬 댓글 영역
+        # 💬 댓글 영역 (댓글 삭제 기능 포함)
         comments = post.get("comments", [])
         with st.expander(f"💬 댓글 ({len(comments)}개)"):
-            for c in comments:
-                st.markdown(f"**{c['author']}** (`{c['date']}`): {c['text']}")
+            for c_idx, c in enumerate(comments):
+                c_id = c.get("id", f"{p_id}_c_{c_idx}")
+                
+                c_col1, c_col2 = st.columns([6, 1])
+                with c_col1:
+                    st.markdown(f"**{c['author']}** (`{c['date']}`): {c['text']}")
+                with c_col2:
+                    if c.get("author") == current_user:
+                        if st.button("삭제", key=f"del_c_{c_id}", use_container_width=True):
+                            updated_posts = copy.deepcopy(posts)
+                            for original_post in updated_posts:
+                                if original_post.get("id") == post.get("id"):
+                                    original_post["comments"] = [
+                                        comm for comm in original_post.get("comments", [])
+                                        if comm.get("id", f"{original_post.get('id')}_c_fallback") != c_id
+                                    ]
+                                    break
+                            save_posts(updated_posts, posts_file_id)
+                            st.rerun()
             
             with st.form(f"comment_form_{p_id}", clear_on_submit=True):
                 st.markdown(f"💬 **{current_user}** 님 이름으로 댓글 남기기")
@@ -540,6 +570,7 @@ else:
                                 if "comments" not in original_post:
                                     original_post["comments"] = []
                                 original_post["comments"].append({
+                                    "id": datetime.now().strftime("%Y%m%d%H%M%S%f"),
                                     "author": current_user,
                                     "text": c_text,
                                     "date": datetime.now().strftime("%m/%d %H:%M")
