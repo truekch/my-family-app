@@ -35,6 +35,14 @@ div[data-testid="InputInstructions"] {
         font-size: 19px !important;
         white-space: nowrap !important;
     }
+    div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
+    }
+    div[data-testid="stColumn"] {
+        min-width: 0 !important;
+    }
 }
 div[data-testid="stButton"] button {
     padding: 4px 8px !important;
@@ -347,8 +355,7 @@ if st.session_state["show_upload_form"]:
             if caption.strip() != "":
                 with st.spinner("구글 드라이브로 저장 중..."):
                     try:
-                        # 타임스탬프 + 마이크로초를 조합하여 유니크한 ID 생성 (충돌 방지)
-                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                         photo_ids = []
                         if photos:
                             for p_idx, photo in enumerate(photos):
@@ -535,17 +542,20 @@ else:
         comments = post.get("comments", [])
         with st.expander(f"💬 댓글 ({len(comments)}개)"):
             for c_idx, c in enumerate(comments):
+                # 구형 데이터 호환을 위한 고유 ID 설정
                 c_id = c.get("id", f"{p_id}_c_{c_idx}")
                 
                 c_col1, c_col2 = st.columns([6, 1])
                 with c_col1:
                     st.markdown(f"**{c['author']}** (`{c['date']}`): {c['text']}")
                 with c_col2:
+                    # 본인이 작성한 댓글일 경우에만 삭제 버튼 노출 (안전성 및 권한 제어)
                     if c.get("author") == current_user:
                         if st.button("삭제", key=f"del_c_{c_id}", use_container_width=True):
                             updated_posts = copy.deepcopy(posts)
                             for original_post in updated_posts:
                                 if original_post.get("id") == post.get("id"):
+                                    # 해당 댓글 ID를 제외하고 남김
                                     original_post["comments"] = [
                                         comm for comm in original_post.get("comments", [])
                                         if comm.get("id", f"{original_post.get('id')}_c_fallback") != c_id
