@@ -117,46 +117,57 @@ if not st.session_state["authenticated"]:
         st.session_state["authenticated"] = True
         st.session_state["current_author"] = st.query_params.get("author")
 
-# --- 🎨 로그인 화면 전용: 2x2 그리드 강제 유지, 높이 1/2 직사각형 및 간격 조정 ---
+# --- 🎨 로그인 화면 전용: 2x2 고정 레이아웃 및 콤팩트한 높이/간격 조정 스타일링 ---
 if not st.session_state["authenticated"]:
     st.markdown("""
     <style>
-    /* 모바일 환경에서도 컬럼이 세로로 쌓이지 않고 2x2 그리드(가로 정렬) 유지 */
-    @media (max-width: 640px) {
-        div[data-testid="stHorizontalBlock"] {
-            flex-direction: row !important;
-        }
-        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-            flex: 1 1 50% !important;
-            min-width: 50% !important;
-        }
+    /* 모바일 및 모든 기기에서 컬럼이 세로로 쌓이지 않고 2x2 그리드(가로 정렬) 강제 유지 */
+    div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 8px !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+        flex: 0 0 50% !important;
+        max-width: 50% !important;
+        min-width: 50% !important;
     }
     
-    /* 2x2 버튼 박스: 높이를 절반으로 낮춘 직사각형 디자인 */
-    div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button {
-        aspect-ratio: 2 / 1 !important; /* 정사각형(1/1)에서 높이를 절반으로 축소 */
+    /* 2x2 버튼 박스: 높이를 대폭 낮추고 글씨 크기에 딱 맞게 콤팩트화 */
+    div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button {
+        height: 40px !important;
+        min-height: 40px !important;
+        max-height: 40px !important;
+        padding: 0px !important;
         width: 100% !important;
-        border-radius: 14px !important;
-        font-size: 20px !important;
-        font-weight: bold !important;
+        border-radius: 10px !important;
         background-color: #ffffff !important;
         border: 2px solid #e2e8f0 !important;
-        box-shadow: 0 3px 6px rgba(0, 0, 0, 0.04) !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04) !important;
         transition: all 0.2s ease !important;
         color: #1a202c !important;
     }
-    div[data-testid="stHorizontalBlock"] div[data-testid="stColumn"] div[data-testid="stButton"] button:hover {
+    div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:hover {
         border-color: #3182ce !important;
         background-color: #ebf8ff !important;
         transform: translateY(-1px);
     }
+    div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button p {
+        font-size: 16px !important;
+        font-weight: bold !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #1a202c !important;
+    }
     
-    /* 위쪽 박스와 아래쪽 박스의 수직 간격을 좌/우 박스 간격과 동일하게 축소 */
+    /* 위쪽 행과 아래쪽 행 사이의 수직 간격을 좌우 간격과 동일하게 밀착 */
     div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:nth-of-type(1) {
-        margin-bottom: 0.4rem !important;
+        margin-bottom: 4px !important;
     }
     div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"]:nth-of-type(2) {
         margin-top: 0px !important;
+        margin-bottom: 4px !important;
     }
     </style>
     """, unsafe_allow_html=True)
